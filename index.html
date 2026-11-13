@@ -620,11 +620,11 @@
         </div>
     </div>
 
-    <!-- Local Ollama AI Assistant; recommendations are reviewed before a fault is recorded. -->
+    <!-- Hosted AI Assistant: signed-in staff call the secure Supabase Edge Function. -->
     <div id="aiAssistantModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="AI Equipment Troubleshooting Assistant">
       <div class="glass-panel rounded-3xl w-full max-w-3xl p-5 sm:p-7 max-h-[92vh] flex flex-col gap-4">
         <div class="flex items-start justify-between gap-3">
-          <div><div class="ai-pill mb-2"><i class="fa-solid fa-microchip"></i> Local Ollama · Qwen3 0.6B (4 GB mode)</div>
+          <div><div class="ai-pill mb-2"><i class="fa-solid fa-cloud"></i> Online AI · GroqCloud · Qwen 3.8 27B</div>
             <h3 class="font-extrabold text-xl"><i class="fa-solid fa-robot text-sky-400 mr-2"></i>AI Troubleshooting Assistant</h3>
             <p class="text-xs opacity-70 mt-1">Analyze a reported issue, then review suggestions before saving a maintenance report.</p>
           </div>
@@ -636,7 +636,7 @@
               <select id="aiEquipmentSelect" class="glass-input rounded-xl w-full p-3 text-sm" onchange="resetAiResult()"></select>
             </label>
             <div class="glass-card rounded-xl px-4 py-3 text-xs flex flex-col justify-center gap-1">
-              <span class="opacity-65">AI connection</span><span id="aiConnectionStatus" role="status" class="font-semibold">Not checked</span>
+              <span class="opacity-65">AI service</span><span id="aiConnectionStatus" role="status" class="font-semibold">Supabase hosted AI</span>
             </div>
           </div>
           <label class="block text-xs font-semibold space-y-2"><span>Describe the symptoms</span>
@@ -644,7 +644,7 @@
           </label>
           <div class="flex flex-wrap items-center gap-2">
             <button type="button" id="aiAnalyzeButton" onclick="analyzeEquipmentWithAi()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl px-5 py-2.5 text-sm"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Analyze with AI</button>
-            <button type="button" onclick="checkOllamaConnection()" class="glass-btn rounded-xl px-4 py-2.5 text-xs">Test connection</button>
+            <span class="text-xs opacity-60">Available to signed-in BROADCAST-IQ staff · usage limits apply</span>
           </div>
           <div id="aiResultPanel" class="glass-card rounded-2xl p-4 space-y-3 hidden" aria-live="polite">
             <div class="flex justify-between items-center gap-2"><h4 class="font-bold text-sm text-sky-300"><i class="fa-solid fa-lightbulb mr-2"></i>AI recommendations</h4><span class="text-[10px] opacity-60">For review only</span></div>
@@ -1361,9 +1361,7 @@
         // Keep the catalog synchronized when a status is changed from an existing dialog.
         const baseSaveState = saveState;
         saveState = function() { baseSaveState(); refreshProductCatalogIfOpen(); };
-        // Ollama runs locally on the same computer as the browser. No API key needed.
-        const OLLAMA_ENDPOINT = 'http://127.0.0.1:11434';
-        const OLLAMA_MODEL = 'qwen3:0.6b';
+        // The hosted AI function keeps its Groq API key in Supabase Secrets.
         let aiLastResult = null;
         let aiRequestController = null;
 
@@ -1381,7 +1379,9 @@
             if (state.items.some(item => item.id === existingSelection)) selector.value = existingSelection;
             resetAiResult();
             openModal('aiAssistantModal');
-            checkOllamaConnection();
+            const aiStatus = document.getElementById('aiConnectionStatus');
+            aiStatus.textContent = cloudUser ? '● Online AI ready for testing' : '● Sign in required';
+            aiStatus.className = cloudUser ? 'font-semibold text-emerald-400' : 'font-semibold text-amber-400';
         }
 
         function resetAiResult() {
@@ -1396,58 +1396,52 @@
             errorElement.classList.remove('hidden');
         }
 
-        async function checkOllamaConnection() {
-            const status = document.getElementById('aiConnectionStatus');
-            status.textContent = 'Checking local service…';
-            try {
-                const response = await fetch(`${OLLAMA_ENDPOINT}/api/tags`, {signal: AbortSignal.timeout(6000)});
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                const available = (data.models || []).some(model => model.name === OLLAMA_MODEL || model.model === OLLAMA_MODEL);
-                status.textContent = available ? '● Connected · Qwen3 ready' : '● Connected · download qwen3:0.6b';
-                status.className = available ? 'font-semibold text-emerald-400' : 'font-semibold text-amber-400';
-            } catch (error) {
-                status.textContent = '● Offline / browser access blocked';
-                status.className = 'font-semibold text-rose-400';
-            }
-        }
-
         async function analyzeEquipmentWithAi() {
             const itemId = document.getElementById('aiEquipmentSelect').value;
             const symptoms = document.getElementById('aiIssueInput').value.trim();
             const item = state.items.find(i => i.id === itemId);
             if (!item) { showAiError('Register or select an equipment unit first.'); return; }
-            if (!symptoms) { showAiError('Please describe the equipment problem first.'); return; }
+            if (symptoms.length < 5) { showAiError('Please describe the problem in at least five characters.'); return; }
+            if (!cloudUser || !cloudClient) { showAiError('Please sign in to use the online AI service.'); return; }
             resetAiResult();
             const model = state.models.find(m => m.id === item.modelId);
             const priorLogs = state.logs.filter(log => log.itemId === itemId).slice(0, 2);
             const history = priorLogs.map(log => String(log.issue || '').slice(0, 100)).join('; ') || 'None';
-            const prompt = `/no_think\nYou are a cautious broadcast equipment assistant. Give a BRIEF answer (maximum 100 words), using exactly these headings: Possible causes, Safe checks, Escalate if. Give safe basic checks only. Do not claim a confirmed diagnosis. Advise checking the manufacturer's manual.\nEquipment: ${model?.name || 'Unknown'}\nStatus: ${item.status}\nPrevious issues: ${history}\nProblem: ${symptoms}`;
             const button = document.getElementById('aiAnalyzeButton');
             button.disabled = true;
-            button.textContent = 'Analyzing… low-memory mode';
+            button.textContent = 'Analyzing with online AI…';
             aiRequestController = new AbortController();
-            const timeout = setTimeout(() => aiRequestController.abort(), 180000);
+            const timeout = setTimeout(() => aiRequestController.abort(), 45000);
             try {
-                const response = await fetch(`${OLLAMA_ENDPOINT}/api/generate`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({model: OLLAMA_MODEL, prompt, stream: false, think: false, options: {temperature: 0.2, num_predict: 180, num_ctx: 1024}}),
+                const {data, error} = await cloudClient.functions.invoke('broadcast-ai', {
+                    body: {
+                        equipment: model?.name || 'Unknown equipment',
+                        status: item.status,
+                        symptoms,
+                        history
+                    },
                     signal: aiRequestController.signal
                 });
-                if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}.`);
-                const result = await response.json();
-                if (!result.response?.trim()) throw new Error('Ollama returned an empty response.');
+                if (error) {
+                    let message = error.message || 'Online AI request failed.';
+                    if (error.context?.json) {
+                        try { const details = await error.context.json(); message = details.error || message; } catch (_) {}
+                    }
+                    throw new Error(message);
+                }
+                if (!data?.success || !data.recommendation?.trim()) {
+                    throw new Error(data?.error || 'The online AI returned no recommendations.');
+                }
                 if (document.getElementById('aiEquipmentSelect').value !== itemId || document.getElementById('aiIssueInput').value.trim() !== symptoms) {
                     showAiError('The selected equipment or symptoms changed while AI was analyzing. Run the analysis again for the updated selection.');
                     return;
                 }
-                aiLastResult = {itemId, symptoms, recommendations: result.response.trim()};
+                aiLastResult = {itemId, symptoms, recommendations: data.recommendation.trim()};
                 document.getElementById('aiResultText').textContent = aiLastResult.recommendations;
                 document.getElementById('aiResultPanel').classList.remove('hidden');
             } catch (error) {
-                const detail = error.name === 'AbortError' ? 'The request timed out after 3 minutes.' : error.message;
-                showAiError(`${detail} Check that Ollama is running and qwen3:0.6b is installed. Close unnecessary apps to free memory. Open this page via http://localhost:8000 (not as a file). If the browser blocks requests, configure Ollama to allow the exact dashboard origin.`);
+                const detail = error.name === 'AbortError' ? 'The online AI request timed out.' : error.message;
+                showAiError(`${detail} Please check your session and the broadcast-ai Edge Function in Supabase.`);
             } finally {
                 clearTimeout(timeout);
                 aiRequestController = null;
