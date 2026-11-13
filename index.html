@@ -297,6 +297,9 @@
         #cloudGate label { display: block; margin-top: 16px; font-size: 12px; color: #b6d7f4; }
         #cloudGate button { width: 100%; padding: 12px; margin-top: 20px; border-radius: 12px; background: #0284c7; color: white; font-weight: 700; }
         #cloudGate p { font-size: 12px; line-height: 1.6; }
+        #cloudGate .cloud-link { width: auto; margin: 10px 0 0; padding: 6px 0; color: #7dd3fc; background: transparent; font-size: 12px; font-weight: 600; }
+        #cloudGate .cloud-link:hover { text-decoration: underline; }
+        #cloudGate .cloud-secondary { color: #bfdbfe; border: 1px solid #355d8a; background: transparent; }
         #cloudBusy { position: fixed; inset: 0; background: #06162dc0; z-index: 9998; display: grid; place-items: center; color: white; font-weight: 700; }
         #cloudBusy.hidden { display: none; }
     </style>
@@ -306,11 +309,20 @@
         <div class="cloud-card">
             <div class="text-xs uppercase tracking-widest text-sky-300 font-bold">Secure equipment management</div>
             <h1 class="text-3xl font-extrabold mt-2 mb-2">BROADCAST-IQ</h1>
-            <p class="text-sky-200/80">Sign in using the staff account created in Supabase. Inventory is shared with authorized team members.</p>
+            <p class="text-sky-200/80">Secure equipment management for authorized staff. New accounts require administrator approval.</p>
             <form id="cloudLoginForm" onsubmit="signInToCloud(event)">
                 <label>Email address<input id="cloudEmail" type="email" autocomplete="username" required></label>
                 <label>Password<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
                 <button id="cloudLoginButton" type="submit">Sign in to inventory</button>
+                <button type="button" class="cloud-link" onclick="showCloudAuthView('signup')">New here? Create an account</button>
+            </form>
+            <form id="cloudSignupForm" class="hidden" onsubmit="registerForCloud(event)">
+                <label>Full name<input id="cloudSignupName" type="text" autocomplete="name" maxlength="100" required></label>
+                <label>Email address<input id="cloudSignupEmail" type="email" autocomplete="email" required></label>
+                <label>Password<input id="cloudSignupPassword" type="password" autocomplete="new-password" minlength="8" required></label>
+                <p class="text-sky-200/70 mt-3">After email verification, an administrator must approve your account before you can access equipment.</p>
+                <button id="cloudSignupButton" type="submit">Request an account</button>
+                <button type="button" class="cloud-link" onclick="showCloudAuthView('signin')">Already registered? Sign in</button>
             </form>
             <p id="cloudLoginMessage" role="alert" class="text-rose-300 mt-4"></p>
         </div>
@@ -341,7 +353,7 @@
                 <button onclick="openProductCatalog()" class="nav-primary glass-btn rounded-xl flex items-center gap-2" title="View and manage registered equipment">
                     <i class="fa-solid fa-box-open"></i><span>Products</span>
                 </button>
-                <button type="button" onclick="openAiAssistant()" class="glass-btn rounded-xl flex items-center gap-2" title="Local AI troubleshooting assistant">
+                <button type="button" onclick="openAiAssistant()" class="glass-btn rounded-xl flex items-center gap-2" title="Online AI troubleshooting assistant">
                     <i class="fa-solid fa-robot text-sky-400"></i><span>AI Assistant</span>
                 </button>
                 <button onclick="openModal('maintenanceLogModal')" class="glass-btn rounded-xl flex items-center gap-2" title="Troubleshooting & Maintenance Log">
@@ -352,11 +364,12 @@
                 <details class="nav-menu" id="navMoreMenu">
                     <summary class="glass-btn"><i class="fa-solid fa-ellipsis text-sky-400"></i>More <i class="fa-solid fa-chevron-down text-[10px] opacity-60"></i></summary>
                     <div class="nav-menu-panel">
-                        <button type="button" onclick="openNavAction('addItemModal')"><i class="fa-solid fa-plus"></i>Register Equipment Unit</button>
-                        <button type="button" onclick="openNavAction('addModelModal')"><i class="fa-solid fa-layer-group"></i>Add Equipment Model</button>
-                        <button type="button" onclick="openNavAction('addLocationModal')"><i class="fa-solid fa-location-dot"></i>Add Location</button>
+                        <button type="button" id="navRegisterUnit" onclick="openNavAction('addItemModal')"><i class="fa-solid fa-plus"></i>Register Equipment Unit</button>
+                        <button type="button" id="navAddModel" onclick="openNavAction('addModelModal')"><i class="fa-solid fa-layer-group"></i>Add Equipment Model</button>
+                        <button type="button" id="navAddLocation" onclick="openNavAction('addLocationModal')"><i class="fa-solid fa-location-dot"></i>Add Location</button>
                         <div class="nav-menu-divider"></div>
-                        <button type="button" onclick="openNavAction('systemMgmtModal')"><i class="fa-solid fa-sliders"></i>System Management</button>
+                        <button type="button" id="navSystemMgmt" onclick="openNavAction('systemMgmtModal')"><i class="fa-solid fa-sliders"></i>System Management</button>
+                        <button type="button" id="userManagementNav" class="hidden" onclick="openUserManagement()"><i class="fa-solid fa-users-gear"></i>User Management</button>
                         <button type="button" onclick="toggleTheme(); closeNavMenu()"><i class="fa-solid fa-circle-half-stroke"></i>Switch Theme</button>
                         <button type="button" onclick="refreshCloudInventory()"><i class="fa-solid fa-cloud-arrow-down"></i>Refresh Shared Inventory</button>
                         <button type="button" onclick="signOutOfCloud()"><i class="fa-solid fa-right-from-bracket"></i>Sign Out</button>
@@ -620,6 +633,25 @@
         </div>
     </div>
 
+    <!-- Administrator-only registration review. The database RPC enforces permissions. -->
+    <div id="userManagementModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="User Management">
+      <div class="glass-panel rounded-3xl w-full max-w-3xl p-6 max-h-[88vh] flex flex-col gap-4">
+        <div class="flex items-start justify-between gap-3">
+          <div><div class="ai-pill mb-2"><i class="fa-solid fa-shield-halved"></i> Administrator access</div>
+            <h3 class="text-xl font-extrabold">User Management</h3>
+            <p class="text-xs opacity-65 mt-1">Approve or reject account requests and assign access roles.</p>
+          </div>
+          <button type="button" class="glass-btn px-3 py-2 rounded-xl" onclick="closeModal('userManagementModal')" aria-label="Close User Management"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <span id="registrationRequestCount" class="text-xs opacity-70">Checking requests…</span>
+          <button type="button" class="glass-btn px-4 py-2 rounded-xl text-xs" onclick="loadRegistrationRequests()"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+        </div>
+        <div id="registrationRequestList" class="space-y-3 overflow-y-auto pr-1 text-sm" aria-live="polite"></div>
+        <p class="text-[11px] opacity-60">Only approve people you know. Administrator access grants significant equipment-management permissions.</p>
+      </div>
+    </div>
+
     <!-- Hosted AI Assistant: signed-in staff call the secure Supabase Edge Function. -->
     <div id="aiAssistantModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="AI Equipment Troubleshooting Assistant">
       <div class="glass-panel rounded-3xl w-full max-w-3xl p-5 sm:p-7 max-h-[92vh] flex flex-col gap-4">
@@ -733,6 +765,15 @@
             document.getElementById('cloudBusy').classList.toggle('hidden', !active);
         };
         const cloudTime = value => value ? new Date(value).toLocaleString() : null;
+        function updateRoleNavigation() {
+            const canWrite = cloudRole === 'admin' || cloudRole === 'technician';
+            const isAdmin = cloudRole === 'admin';
+            for (const [id, visible] of [
+                ['navRegisterUnit', canWrite], ['navAddModel', isAdmin],
+                ['navAddLocation', isAdmin], ['navSystemMgmt', isAdmin],
+                ['userManagementNav', isAdmin]
+            ]) document.getElementById(id)?.classList.toggle('hidden', !visible);
+        }
         async function cloudRead(table) {
             const {data, error} = await cloudClient.from(table).select('*');
             if (error) throw error;
@@ -802,6 +843,43 @@
             if (error) throw error;
             if (!data?.length) throw new Error('Record was not deleted; check account permissions.');
         }
+        function showCloudAuthView(view) {
+            document.getElementById('cloudLoginForm').classList.toggle('hidden', view !== 'signin');
+            document.getElementById('cloudSignupForm').classList.toggle('hidden', view !== 'signup');
+            document.getElementById('cloudLoginMessage').textContent = '';
+        }
+        async function registerForCloud(event) {
+            event.preventDefault();
+            const button = document.getElementById('cloudSignupButton');
+            const message = document.getElementById('cloudLoginMessage');
+            button.disabled = true;
+            message.textContent = 'Submitting your registration…';
+            try {
+                if (!cloudClient) throw new Error('Connection to Supabase is unavailable.');
+                const fullName = document.getElementById('cloudSignupName').value.trim();
+                const email = document.getElementById('cloudSignupEmail').value.trim();
+                const password = document.getElementById('cloudSignupPassword').value;
+                if (fullName.length < 2) throw new Error('Enter your full name.');
+                if (password.length < 8) throw new Error('Use a password with at least 8 characters.');
+                const {error} = await cloudClient.auth.signUp({
+                    email, password,
+                    options: {
+                        data: {full_name: fullName},
+                        emailRedirectTo: window.location.origin + window.location.pathname
+                    }
+                });
+                if (error) throw error;
+                // Even if email confirmation is disabled, new accounts have pending status.
+                await cloudClient.auth.signOut();
+                showCloudAuthView('signin');
+                message.className = 'text-sky-200 mt-4';
+                message.textContent = 'Registration submitted. Check your email for a verification link if prompted, then wait for administrator approval before signing in.';
+                document.getElementById('cloudSignupForm').reset();
+            } catch (error) {
+                message.className = 'text-rose-300 mt-4';
+                message.textContent = cloudError(error);
+            } finally { button.disabled = false; }
+        }
         async function signInToCloud(event) {
             event.preventDefault();
             const button = document.getElementById('cloudLoginButton');
@@ -828,18 +906,89 @@
                 cloudUser = null;
                 throw new Error('This account has no BROADCAST-IQ profile. Ask an admin to assign a role.');
             }
+            if (profile.role === 'pending' || profile.role === 'rejected') {
+                await cloudClient.auth.signOut();
+                cloudUser = null;
+                cloudRole = null;
+                throw new Error(profile.role === 'pending'
+                    ? 'Your account is awaiting administrator approval. Please try again after approval.'
+                    : 'Your registration was not approved. Contact the system administrator.');
+            }
+            if (!['admin','technician','viewer'].includes(profile.role)) {
+                cloudUser = null;
+                throw new Error('This account does not have an approved access role.');
+            }
             cloudRole = profile.role;
             await loadCloudInventory();
+            updateRoleNavigation();
             document.getElementById('cloudGate').classList.add('hidden');
         }
         async function signOutOfCloud() {
             if (!cloudClient) return;
             await cloudClient.auth.signOut();
             cloudUser = null; cloudRole = null;
+            updateRoleNavigation();
             state.items = []; state.models = []; state.logs = []; state.locations = [];
             render();
             document.getElementById('cloudGate').classList.remove('hidden');
             closeNavMenu();
+        }
+        async function openUserManagement() {
+            closeNavMenu();
+            if (cloudRole !== 'admin') return alert('Administrator access required.');
+            openModal('userManagementModal');
+            await loadRegistrationRequests();
+        }
+        async function loadRegistrationRequests() {
+            if (cloudRole !== 'admin') return;
+            const list = document.getElementById('registrationRequestList');
+            const count = document.getElementById('registrationRequestCount');
+            list.textContent = 'Loading registration requests…';
+            try {
+                const {data, error} = await cloudClient.rpc('list_registration_requests');
+                if (error) throw error;
+                count.textContent = `${data.length} pending registration${data.length === 1 ? '' : 's'}`;
+                if (!data.length) {
+                    list.innerHTML = '<div class="glass-card rounded-2xl p-8 text-center text-sm opacity-70">No pending registration requests.</div>';
+                    return;
+                }
+                list.innerHTML = data.map(request => `
+                    <div class="glass-card rounded-2xl p-4 space-y-3 border border-sky-500/20">
+                        <div class="font-semibold">${htmlSafe(request.full_name || 'Unnamed applicant')}</div>
+                        <div class="text-xs opacity-70 break-all">${htmlSafe(request.email || '')}</div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label class="text-xs flex items-center gap-2">Assign role
+                                <select id="requestRole-${request.user_id}" class="glass-input rounded-xl px-3 py-2">
+                                  <option value="viewer">Viewer</option>
+                                  <option value="technician">Technician</option>
+                                  <option value="admin">Administrator</option>
+                                </select>
+                            </label>
+                            <button type="button" class="bg-sky-600 text-white text-xs font-bold rounded-xl px-4 py-2" onclick="reviewRegistration('${request.user_id}', 'approve')">Approve</button>
+                            <button type="button" class="glass-btn text-rose-300 text-xs rounded-xl px-4 py-2" onclick="reviewRegistration('${request.user_id}', 'reject')">Reject</button>
+                        </div>
+                    </div>`).join('');
+            } catch (error) {
+                count.textContent = 'Could not load requests';
+                list.textContent = cloudError(error);
+            }
+        }
+        async function reviewRegistration(userId, decision) {
+            if (cloudRole !== 'admin') return;
+            const role = document.getElementById(`requestRole-${userId}`)?.value || 'viewer';
+            if (!confirm(decision === 'approve'
+                ? `Approve this user as ${role}?`
+                : 'Reject this registration request?')) return;
+            showCloudBusy(true, 'Updating registration…');
+            try {
+                const {data, error} = await cloudClient.rpc('review_registration', {
+                    p_user_id: userId, p_decision: decision, p_role: role
+                });
+                if (error) throw error;
+                if (!data?.success) throw new Error('The database did not confirm the decision.');
+                await loadRegistrationRequests();
+            } catch (error) { alert('Could not review registration: ' + cloudError(error)); }
+            finally { showCloudBusy(false); }
         }
         async function initializeCloud() {
             if (!cloudClient) {
@@ -1334,11 +1483,13 @@
               <div class="mt-4"><h4 class="font-semibold text-sm mb-2">Maintenance history (${logs.length})</h4>
               <div class="space-y-2 max-h-44 overflow-y-auto">${logs.length ? logs.map(log => `<div class="glass-card rounded-xl p-3 text-xs space-y-1"><div class="font-semibold">${htmlSafe(log.status)}</div><div>${htmlSafe(log.issue)}</div><div class="opacity-70">${htmlSafe(log.action)}</div><div class="opacity-60">Reported: ${htmlSafe(log.troubleshotAt || 'N/A')}${log.repairedAt ? ' · Repaired: ' + htmlSafe(log.repairedAt) : ''}</div></div>`).join('') : '<p class="text-xs opacity-60">No maintenance records yet.</p>'}</div></div>`;
             const common = 'type="button" class="rounded-xl px-4 py-2.5 text-sm font-semibold transition"';
-            document.getElementById('productDetailActions').innerHTML = `
-              ${item.status === 'Available' ? `<button ${common} style="background:#0284c7;color:white" onclick="productDispatch('${item.id}')"><i class="fa-solid fa-truck-fast mr-2"></i>Dispatch</button>` : ''}
-              ${item.status === 'In-Use' ? `<button ${common} style="background:#0284c7;color:white" onclick="productCheckIn('${item.id}')"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>Check In</button>` : ''}
-              ${item.status !== 'Defective' ? `<button ${common} style="background:#be123c;color:white" onclick="productReportFault('${item.id}')"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Report Fault</button>` : ''}
-              ${item.status === 'Defective' ? `<button ${common} style="background:#047857;color:white" onclick="productMarkRepaired('${item.id}')"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Mark as Repaired</button>` : ''}
+            document.getElementById('productDetailActions').innerHTML = !['admin','technician'].includes(cloudRole)
+              ? '<span class="text-xs opacity-70">View-only account · equipment changes require a technician or administrator.</span>'
+              : `
+                ${item.status === 'Available' ? `<button ${common} style="background:#0284c7;color:white" onclick="productDispatch('${item.id}')"><i class="fa-solid fa-truck-fast mr-2"></i>Dispatch</button>` : ''}
+                ${item.status === 'In-Use' ? `<button ${common} style="background:#0284c7;color:white" onclick="productCheckIn('${item.id}')"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>Check In</button>` : ''}
+                ${item.status !== 'Defective' ? `<button ${common} style="background:#be123c;color:white" onclick="productReportFault('${item.id}')"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Report Fault</button>` : ''}
+                ${item.status === 'Defective' ? `<button ${common} style="background:#047857;color:white" onclick="productMarkRepaired('${item.id}')"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Mark as Repaired</button>` : ''}
               `;
             openModal('productDetailModal');
         }
