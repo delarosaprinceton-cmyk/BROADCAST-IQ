@@ -6,6 +6,7 @@
     <title>BROADCAST-IQ | Equipment Monitoring Dashboard</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
@@ -289,9 +290,32 @@
             .hero { padding: 24px; }
             .hero-eyebrow { letter-spacing: .12em; }
         }
+        #cloudGate { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; background: #07162e; color: #e0f2fe; }
+        #cloudGate.hidden { display: none; }
+        #cloudGate .cloud-card { width: min(100%, 420px); padding: 32px; border: 1px solid #285487; border-radius: 24px; background: linear-gradient(145deg,#102d51,#091b35); box-shadow: 0 28px 100px #0008; }
+        #cloudGate input { width: 100%; margin-top: 7px; padding: 12px 14px; color: #fff; border: 1px solid #355d8a; background: #06162d; border-radius: 12px; }
+        #cloudGate label { display: block; margin-top: 16px; font-size: 12px; color: #b6d7f4; }
+        #cloudGate button { width: 100%; padding: 12px; margin-top: 20px; border-radius: 12px; background: #0284c7; color: white; font-weight: 700; }
+        #cloudGate p { font-size: 12px; line-height: 1.6; }
+        #cloudBusy { position: fixed; inset: 0; background: #06162dc0; z-index: 9998; display: grid; place-items: center; color: white; font-weight: 700; }
+        #cloudBusy.hidden { display: none; }
     </style>
 </head>
 <body class="min-h-screen selection:bg-sky-500 selection:text-white antialiased relative">
+    <div id="cloudGate">
+        <div class="cloud-card">
+            <div class="text-xs uppercase tracking-widest text-sky-300 font-bold">Secure equipment management</div>
+            <h1 class="text-3xl font-extrabold mt-2 mb-2">BROADCAST-IQ</h1>
+            <p class="text-sky-200/80">Sign in using the staff account created in Supabase. Inventory is shared with authorized team members.</p>
+            <form id="cloudLoginForm" onsubmit="signInToCloud(event)">
+                <label>Email address<input id="cloudEmail" type="email" autocomplete="username" required></label>
+                <label>Password<input id="cloudPassword" type="password" autocomplete="current-password" required></label>
+                <button id="cloudLoginButton" type="submit">Sign in to inventory</button>
+            </form>
+            <p id="cloudLoginMessage" role="alert" class="text-rose-300 mt-4"></p>
+        </div>
+    </div>
+    <div id="cloudBusy" class="hidden"><span id="cloudBusyText">Saving equipment records…</span></div>
 
     <div class="ambient-orb orb-1"></div>
     <div class="ambient-orb orb-2"></div>
@@ -334,7 +358,8 @@
                         <div class="nav-menu-divider"></div>
                         <button type="button" onclick="openNavAction('systemMgmtModal')"><i class="fa-solid fa-sliders"></i>System Management</button>
                         <button type="button" onclick="toggleTheme(); closeNavMenu()"><i class="fa-solid fa-circle-half-stroke"></i>Switch Theme</button>
-                        <button type="button" onclick="confirmResetDashboard()"><i class="fa-solid fa-arrow-rotate-left"></i>Reset Demo Inventory</button>
+                        <button type="button" onclick="refreshCloudInventory()"><i class="fa-solid fa-cloud-arrow-down"></i>Refresh Shared Inventory</button>
+                        <button type="button" onclick="signOutOfCloud()"><i class="fa-solid fa-right-from-bracket"></i>Sign Out</button>
                     </div>
                 </details>
             </div>
@@ -694,14 +719,138 @@
             ]
         };
 
-        let state;
-        try {
-            const saved = JSON.parse(localStorage.getItem('broadcastIqGlassState'));
-            state = saved && Array.isArray(saved.items) && Array.isArray(saved.models) && Array.isArray(saved.locations) && Array.isArray(saved.logs)
-                ? saved : JSON.parse(JSON.stringify(INITIAL_STATE));
-        } catch (error) {
-            state = JSON.parse(JSON.stringify(INITIAL_STATE));
-            alert('Saved inventory data could not be read. Demo inventory was loaded; check your browser storage before making changes.');
+        // Database, not localStorage, is authoritative for all shared equipment records.
+        let state = {theme: localStorage.getItem('broadcastIqTheme') || 'dark', locations: [], models: [], items: [], logs: []};
+        const CLOUD_URL = 'https://aftvyvriuxoeiuynugwz.supabase.co';
+        const CLOUD_PUBLISHABLE_KEY = 'sb_publishable_nWVdDyvoGtcKEOturW1RMg_GFUCuIHJ';
+        const cloudClient = window.supabase?.createClient(CLOUD_URL, CLOUD_PUBLISHABLE_KEY);
+        let cloudUser = null;
+        let cloudRole = null;
+        let cloudWriteInProgress = false;
+        const cloudError = error => error?.message || String(error);
+        const showCloudBusy = (active, message = 'Saving equipment records…') => {
+            document.getElementById('cloudBusyText').textContent = message;
+            document.getElementById('cloudBusy').classList.toggle('hidden', !active);
+        };
+        const cloudTime = value => value ? new Date(value).toLocaleString() : null;
+        async function cloudRead(table) {
+            const {data, error} = await cloudClient.from(table).select('*');
+            if (error) throw error;
+            return data || [];
+        }
+        async function loadCloudInventory() {
+            if (!cloudUser) throw new Error('Sign in to load equipment.');
+            const [locations, models, units, logs] = await Promise.all([
+                cloudRead('locations'), cloudRead('equipment_models'),
+                cloudRead('equipment_units'), cloudRead('maintenance_logs')
+            ]);
+            const locationById = new Map(locations.map(loc => [loc.id, loc.name]));
+            state.locations = locations.map(loc => ({id: loc.id, name: loc.name, desc: loc.description || ''}));
+            state.models = models.map(model => ({id: model.id, name: model.name, category: model.category || ''}));
+            state.items = units.map(unit => ({
+                id: unit.id, modelId: unit.model_id, serial: unit.serial_number,
+                status: unit.status, location: locationById.get(unit.location_id) || 'Unknown location'
+            }));
+            state.logs = logs.map(log => ({
+                id: log.id, itemId: log.unit_id, issue: log.issue,
+                action: log.action_plan, reportedBy: log.reported_by,
+                status: log.status, troubleshotAt: cloudTime(log.reported_at),
+                repairedAt: cloudTime(log.repaired_at), repairWork: log.repair_work,
+                repairedBy: log.repaired_by, testPassed: log.test_passed
+            })).sort((a,b) => String(b.troubleshotAt).localeCompare(String(a.troubleshotAt)));
+            render();
+            refreshProductCatalogIfOpen();
+            if (!document.getElementById('productDetailModal').classList.contains('hidden')) {
+                // Avoid displaying a stale status/location or stale action buttons.
+                closeModal('productDetailModal');
+            }
+        }
+        async function refreshCloudInventory() {
+            try {
+                showCloudBusy(true, 'Refreshing shared inventory…');
+                await loadCloudInventory();
+            } catch (error) { alert('Could not refresh inventory: ' + cloudError(error)); }
+            finally { showCloudBusy(false); }
+        }
+        async function cloudAction(task, label = 'Saving equipment records…') {
+            if (cloudWriteInProgress) return;
+            if (!cloudUser) return alert('Sign in before changing inventory.');
+            if (!['admin','technician'].includes(cloudRole)) return alert('This account has view-only access.');
+            cloudWriteInProgress = true;
+            showCloudBusy(true, label);
+            try {
+                await task();
+                await loadCloudInventory();
+                return true;
+            } catch (error) {
+                alert('Cloud update failed: ' + cloudError(error));
+                try { await loadCloudInventory(); } catch (_) {}
+                return false;
+            } finally { cloudWriteInProgress = false; showCloudBusy(false); }
+        }
+        async function cloudRpc(name, parameters) {
+            const {data, error} = await cloudClient.rpc(name, parameters);
+            if (error) throw error;
+            if (!data?.success) throw new Error('Database did not confirm the operation.');
+        }
+        async function cloudInsert(table, payload) {
+            const {error} = await cloudClient.from(table).insert(payload);
+            if (error) throw error;
+        }
+        async function cloudDelete(table, id) {
+            const {data, error} = await cloudClient.from(table).delete().eq('id', id).select('id');
+            if (error) throw error;
+            if (!data?.length) throw new Error('Record was not deleted; check account permissions.');
+        }
+        async function signInToCloud(event) {
+            event.preventDefault();
+            const button = document.getElementById('cloudLoginButton');
+            const message = document.getElementById('cloudLoginMessage');
+            button.disabled = true;
+            message.textContent = 'Signing in…';
+            try {
+                if (!cloudClient) throw new Error('Supabase library did not load. Check the internet connection.');
+                const {data, error} = await cloudClient.auth.signInWithPassword({
+                    email: document.getElementById('cloudEmail').value.trim(),
+                    password: document.getElementById('cloudPassword').value
+                });
+                if (error) throw error;
+                await connectCloudUser(data.user);
+                document.getElementById('cloudPassword').value = '';
+            } catch (error) { message.textContent = cloudError(error); }
+            finally { button.disabled = false; }
+        }
+        async function connectCloudUser(user) {
+            if (!user) return;
+            cloudUser = user;
+            const {data: profile, error} = await cloudClient.from('user_profiles').select('role').eq('user_id', user.id).single();
+            if (error || !profile) {
+                cloudUser = null;
+                throw new Error('This account has no BROADCAST-IQ profile. Ask an admin to assign a role.');
+            }
+            cloudRole = profile.role;
+            await loadCloudInventory();
+            document.getElementById('cloudGate').classList.add('hidden');
+        }
+        async function signOutOfCloud() {
+            if (!cloudClient) return;
+            await cloudClient.auth.signOut();
+            cloudUser = null; cloudRole = null;
+            state.items = []; state.models = []; state.logs = []; state.locations = [];
+            render();
+            document.getElementById('cloudGate').classList.remove('hidden');
+            closeNavMenu();
+        }
+        async function initializeCloud() {
+            if (!cloudClient) {
+                document.getElementById('cloudLoginMessage').textContent = 'Could not load Supabase. Connect to the internet and refresh.';
+                return;
+            }
+            try {
+                const {data, error} = await cloudClient.auth.getUser();
+                if (error && error.name !== 'AuthSessionMissingError') throw error;
+                if (data?.user) await connectCloudUser(data.user);
+            } catch (error) { document.getElementById('cloudLoginMessage').textContent = cloudError(error); }
         }
         let activeStatusFilter = 'ALL';
 
@@ -718,8 +867,8 @@
         };
 
         function saveState() {
-            try { localStorage.setItem('broadcastIqGlassState', JSON.stringify(state)); }
-            catch (error) { alert('Changes could not be saved in this browser. Please check that browser storage is enabled.'); }
+            // Only the user's color preference is local. Equipment always lives in Supabase.
+            try { localStorage.setItem('broadcastIqTheme', state.theme); } catch (_) {}
             render();
         }
 
@@ -730,10 +879,7 @@
         }
 
         function resetData() {
-            state = JSON.parse(JSON.stringify(INITIAL_STATE));
-            activeStatusFilter = 'ALL';
-            document.documentElement.setAttribute('data-theme', state.theme);
-            saveState();
+            alert('Demo reset is disabled for the shared online inventory.');
         }
 
         function filterModels() { openProductCatalog(); }
@@ -870,10 +1016,8 @@
         }
 
         /* Deletion Action Handlers */
-        function deleteAssetItem(id) {
-            state.items = state.items.filter(i => i.id !== id);
-            state.logs = state.logs.filter(l => l.itemId !== id);
-            saveState();
+        async function deleteAssetItem(id) {
+            await cloudAction(() => cloudDelete('equipment_units', id));
         }
 
         function deleteSelectedAsset() {
@@ -893,7 +1037,7 @@
             }
         }
 
-        function deleteSelectedLocation() {
+        async function deleteSelectedLocation() {
             const locId = document.getElementById('deleteLocationSelect').value;
             const locObj = state.locations.find(l => l.id === locId);
             if (!locObj) return;
@@ -905,12 +1049,11 @@
             }
 
             if (confirm(`Delete location "${locObj.name}"?`)) {
-                state.locations = state.locations.filter(l => l.id !== locId);
-                saveState();
+                await cloudAction(() => cloudDelete('locations', locId));
             }
         }
 
-        function deleteSelectedModel() {
+        async function deleteSelectedModel() {
             const modelId = document.getElementById('deleteModelSelect').value;
             const modelObj = state.models.find(m => m.id === modelId);
             if (!modelObj) return;
@@ -922,8 +1065,7 @@
             }
 
             if (confirm(`Delete equipment model "${modelObj.name}"?`)) {
-                state.models = state.models.filter(m => m.id !== modelId);
-                saveState();
+                await cloudAction(() => cloudDelete('equipment_models', modelId));
             }
         }
 
@@ -938,19 +1080,19 @@
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
         /* Form Processing Handlers */
-        function submitNewLocation(e) {
+        async function submitNewLocation(e) {
             e.preventDefault();
             const name = trimmed(document.getElementById('newLocationName').value);
             const desc = trimmed(document.getElementById('newLocationDesc').value);
             if (!name) return alert('Enter a location name.');
             if (state.locations.some(l => equalsIgnoreCase(l.name, name))) return alert('That location already exists.');
-            state.locations.push({ id: newRecordId('LOC'), name, desc });
-            closeModal('addLocationModal');
-            document.getElementById('addLocationForm').reset();
-            saveState();
+            if (await cloudAction(() => cloudInsert('locations', {id: newRecordId('LOC'), name, description: desc}))) {
+                closeModal('addLocationModal');
+                document.getElementById('addLocationForm').reset();
+            }
         }
 
-        function submitNewModel(e) {
+        async function submitNewModel(e) {
             e.preventDefault();
             const id = trimmed(document.getElementById('newModelId').value);
             const name = trimmed(document.getElementById('newModelName').value);
@@ -958,23 +1100,27 @@
             if (!id || !name || !category) return alert('Complete all required model details.');
             if (state.models.some(m => equalsIgnoreCase(m.id, id))) return alert('This model code already exists. Use a unique model code.');
             if (state.models.some(m => equalsIgnoreCase(m.name, name))) return alert('A model with this name already exists. Register another unit under the existing model.');
-            state.models.push({ id, name, category });
-            closeModal('addModelModal');
-            document.getElementById('addModelForm').reset();
-            saveState();
+            if (await cloudAction(() => cloudInsert('equipment_models', {id, name, category}))) {
+                closeModal('addModelModal');
+                document.getElementById('addModelForm').reset();
+            }
         }
 
-        function submitNewItem(e) {
+        async function submitNewItem(e) {
             e.preventDefault();
             const modelId = document.getElementById('newItemModelSelect').value;
             const serial = trimmed(document.getElementById('newItemSerial').value);
             const location = document.getElementById('newItemLocation').value;
             if (!serial || !state.models.some(m => m.id === modelId) || !state.locations.some(l => l.name === location)) return alert('Enter a serial number and select a valid model and location.');
             if (state.items.some(i => equalsIgnoreCase(i.serial, serial))) return alert('This serial number or asset tag is already registered.');
-            state.items.push({ id: newRecordId('ITM'), modelId, serial, status: 'Available', location });
-            closeModal('addItemModal');
-            document.getElementById('addItemForm').reset();
-            saveState();
+            const locationId = state.locations.find(l => l.name === location)?.id;
+            if (await cloudAction(() => cloudInsert('equipment_units', {
+                id: newRecordId('ITM'), model_id: modelId, serial_number: serial,
+                status: 'Available', location_id: locationId
+            }))) {
+                closeModal('addItemModal');
+                document.getElementById('addItemForm').reset();
+            }
         }
 
         function openMaintModal(itemId) {
@@ -989,32 +1135,22 @@
             openModal('maintModal');
         }
 
-        function submitMaintenanceLog(e) {
+        async function submitMaintenanceLog(e) {
             e.preventDefault();
             const itemId = document.getElementById('maintItemId').value;
             const issue = trimmed(document.getElementById('maintIssue').value);
             const action = trimmed(document.getElementById('maintAction').value);
             const reportedBy = trimmed(document.getElementById('maintReporter').value);
-            const timestamp = localTimestamp();
             
             const item = state.items.find(i => i.id === itemId);
             if (!item || item.status === 'Defective' || state.logs.some(log => log.itemId === itemId && log.status === 'Active Issue')) return alert('Fault cannot be submitted: this equipment already has an active fault.');
             if (!issue || !action || !reportedBy) return alert('Complete the reporter, issue, and action plan fields.');
-            item.status = 'Defective';
-            
-            state.logs.unshift({ 
-                id: newRecordId('LOG'),
-                itemId, 
-                issue, 
-                action,
-                reportedBy,
-                status: 'Active Issue',
-                troubleshotAt: timestamp,
-                repairedAt: null
-            });
-            closeModal('maintModal');
-            document.getElementById('maintForm').reset();
-            saveState();
+            if (await cloudAction(() => cloudRpc('report_equipment_fault', {
+                p_unit_id: itemId, p_issue: issue, p_action_plan: action, p_reported_by: reportedBy
+            }), 'Reporting equipment fault…')) {
+                closeModal('maintModal');
+                document.getElementById('maintForm').reset();
+            }
         }
 
         function openDeployModal(itemId) {
@@ -1026,7 +1162,7 @@
             openModal('deployModal');
         }
 
-        function submitDeployment(e) {
+        async function submitDeployment(e) {
             e.preventDefault();
             const itemId = document.getElementById('deployItemId').value;
             const location = document.getElementById('deployLocation').value;
@@ -1034,12 +1170,13 @@
             const item = state.items.find(i => i.id === itemId);
             if (!item || item.status !== 'Available') return alert('This unit is no longer Available. Refresh the catalog.');
             if (!state.locations.some(l => l.name === location)) return alert('Choose a valid destination location.');
-            item.status = 'In-Use';
-            item.location = location;
-            
+            const destination = state.locations.find(l => l.name === location);
+            const saved = await cloudAction(() => cloudRpc('dispatch_equipment', {
+                p_unit_id: itemId, p_destination_location_id: destination.id
+            }), 'Dispatching equipment…');
+            if (!saved) return;
             closeModal('deployModal');
             document.getElementById('deployForm').reset();
-            saveState();
             // The catalog stays open beneath the dispatch dialog. Reflect the
             // updated location and status immediately, with visible feedback.
             if (!document.getElementById('productCatalogModal').classList.contains('hidden')) {
@@ -1049,13 +1186,11 @@
             }
         }
 
-        function checkInItem(id) {
+        async function checkInItem(id) {
             const item = state.items.find(i => i.id === id);
             if (!item || item.status !== 'In-Use') return alert('Only In-Use equipment can be checked in.');
             if (!state.locations.some(l => l.name === 'Equipment Locker')) return alert('Add an Equipment Locker location before checking in units.');
-            item.status = 'Available';
-            item.location = 'Equipment Locker';
-            saveState();
+            return cloudAction(() => cloudRpc('check_in_equipment', {p_unit_id: id}), 'Checking in equipment…');
         }
 
         function openRepairModal(id) {
@@ -1068,7 +1203,7 @@
             openModal('repairModal');
         }
 
-        function submitRepair(e) {
+        async function submitRepair(e) {
             e.preventDefault();
             const id = document.getElementById('repairItemId').value;
             const item = state.items.find(i => i.id === id);
@@ -1076,22 +1211,12 @@
             const repairWork = trimmed(document.getElementById('repairWork').value);
             const technician = trimmed(document.getElementById('repairTechnician').value);
             if (repairWork.length < 5 || !technician || !document.getElementById('repairTestPassed').checked) return alert('Enter repair details and confirm the functional test passed.');
-            const activeLogs = state.logs.filter(l => l.itemId === id && l.status === 'Active Issue');
-            const timestamp = localTimestamp();
-            // Legacy inventory may contain multiple active logs; resolve every one together.
-            activeLogs.forEach(log => {
-                log.status = 'Repaired / Back in Service';
-                log.repairedAt = timestamp;
-                log.repairWork = repairWork;
-                log.repairedBy = technician;
-                log.testPassed = true;
-            });
-            if (!activeLogs.length) {
-                state.logs.unshift({id: newRecordId('LOG'), itemId: id, issue: 'Legacy defective status (no issue record)', action: 'Repair completion recorded', status: 'Repaired / Back in Service', troubleshotAt: timestamp, repairedAt: timestamp, repairWork, repairedBy: technician, testPassed: true});
+            if (await cloudAction(() => cloudRpc('complete_equipment_repair', {
+                p_unit_id: id, p_repair_work: repairWork,
+                p_repaired_by: technician, p_test_passed: true
+            }), 'Saving completed repair…')) {
+                closeModal('repairModal');
             }
-            item.status = 'Available';
-            closeModal('repairModal');
-            saveState();
         }
 
         // Product catalog and detailed asset actions
@@ -1221,9 +1346,12 @@
             if (!document.getElementById('productCatalogModal').classList.contains('hidden')) renderProductCatalog();
         }
         function productDispatch(id) { closeModal('productDetailModal'); openDeployModal(id); }
-        function productCheckIn(id) {
+        async function productCheckIn(id) {
             if (!confirm('Check in this equipment and mark it Available?')) return;
-            checkInItem(id); closeModal('productDetailModal'); refreshProductCatalogIfOpen();
+            if (await checkInItem(id)) {
+                closeModal('productDetailModal');
+                refreshProductCatalogIfOpen();
+            }
         }
         function productReportFault(id) { closeModal('productDetailModal'); openMaintModal(id); }
         function productMarkRepaired(id) {
@@ -1352,7 +1480,7 @@
         }
         function confirmResetDashboard() {
             closeNavMenu();
-            if (confirm('Restore the original demo inventory? This will replace your saved equipment and maintenance changes.')) resetData();
+            alert('Reset is disabled for the shared Supabase inventory. Use Refresh Shared Inventory instead.');
         }
         document.addEventListener('click', e => {
             const menu = document.getElementById('navMoreMenu');
@@ -1366,6 +1494,7 @@
         });
 
         render();
+        initializeCloud();
     </script>
 </body>
 </html>
