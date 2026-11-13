@@ -1413,7 +1413,7 @@
             aiRequestController = new AbortController();
             const timeout = setTimeout(() => aiRequestController.abort(), 45000);
             try {
-                const {data, error} = await cloudClient.functions.invoke('broadcast-ai', {
+                const {data, error} = await cloudClient.functions.invoke('clever-endpoint', {
                     body: {
                         equipment: model?.name || 'Unknown equipment',
                         status: item.status,
