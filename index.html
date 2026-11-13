@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BROADCAST-IQ | Equipment Monitoring Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+        
+        :root {
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.22) 0px, transparent 50%),
+                           radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.2) 0px, transparent 50%),
+                           radial-gradient(at 50% 50%, rgba(14, 165, 233, 0.1) 0px, transparent 70%),
+                           #030712;
+            
+            --orb-color-1: #0284c7;
+            --orb-color-2: #38bdf8;
+            --orb-color-3: #4f46e5;
+
+            --glass-base: rgba(15, 23, 42, 0.65);
+            --glass-panel: rgba(15, 23, 42, 0.5);
+            --glass-card: rgba(255, 255, 255, 0.03);
+            --glass-card-hover: rgba(56, 189, 248, 0.08);
+            --glass-interactive: rgba(255, 255, 255, 0.06);
+            --glass-input: rgba(3, 7, 18, 0.7);
+
+            --glass-blur: blur(24px);
+            --glass-blur-sm: blur(12px);
+            --glass-border: 1px solid rgba(56, 189, 248, 0.2);
+            --glass-border-light: 1px solid rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.6);
+
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        [data-theme="light"] {
+            --bg-gradient: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.35) 0px, transparent 50%),
+                           radial-gradient(at 100% 100%, rgba(129, 140, 248, 0.3) 0px, transparent 50%),
+                           #e0f2fe;
+
+            --orb-color-1: #7dd3fc;
+            --orb-color-2: #a5b4fc;
+            --orb-color-3: #38bdf8;
+
+            --glass-base: rgba(255, 255, 255, 0.6);
+            --glass-panel: rgba(255, 255, 255, 0.5);
+            --glass-card: rgba(255, 255, 255, 0.7);
+            --glass-card-hover: rgba(255, 255, 255, 0.9);
+            --glass-interactive: rgba(255, 255, 255, 0.75);
+            --glass-input: rgba(255, 255, 255, 0.9);
+
+            --glass-blur: blur(24px);
+            --glass-blur-sm: blur(12px);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.8);
+            --glass-border-light: 1px solid rgba(186, 230, 253, 0.6);
+            --glass-shadow: 0 16px 40px 0 rgba(14, 165, 233, 0.12);
+
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            transition: background 0.4s ease, color 0.4s ease;
+        }
+
+        .ambient-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.55;
+            transition: background 0.5s ease;
+        }
+        .orb-1 { width: 500px; height: 500px; background: var(--orb-color-1); top: -120px; left: -100px; }
+        .orb-2 { width: 550px; height: 550px; background: var(--orb-color-2); bottom: -150px; right: -120px; }
+        .orb-3 { width: 400px; height: 400px; background: var(--orb-color-3); top: 35%; left: 35%; }
+
+        .glass-header {
+            background: var(--glass-base);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border-bottom: var(--glass-border);
+            box-shadow: var(--glass-shadow);
+        }
+
+        .glass-panel {
+            background: var(--glass-panel);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: var(--glass-border);
+            box-shadow: var(--glass-shadow);
+        }
+
+        .glass-card {
+            background: var(--glass-card);
+            backdrop-filter: var(--glass-blur-sm);
+            -webkit-backdrop-filter: var(--glass-blur-sm);
+            border: var(--glass-border-light);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: var(--glass-card-hover);
+            border: var(--glass-border);
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px -10px rgba(56, 189, 248, 0.25);
+        }
+
+        .glass-card.active-kpi {
+            border-color: rgba(56, 189, 248, 0.8) !important;
+            background: var(--glass-card-hover) !important;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3) !important;
+        }
+
+        .glass-input {
+            background: var(--glass-input) !important;
+            backdrop-filter: var(--glass-blur-sm);
+            border: var(--glass-border-light) !important;
+            color: var(--text-primary) !important;
+            transition: all 0.2s ease;
+        }
+
+        .glass-input:focus {
+            border: var(--glass-border) !important;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.3);
+        }
+
+        .glass-btn {
+            background: var(--glass-interactive);
+            backdrop-filter: var(--glass-blur-sm);
+            border: var(--glass-border);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .glass-btn:hover {
+            background: var(--glass-card-hover);
+            border-color: rgba(56, 189, 248, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Azure design system — refined surfaces, crisp hierarchy and calm contrast. */
+        :root {
+            --bg-gradient: radial-gradient(ellipse at 12% 0%, rgba(37,99,235,.24), transparent 42%),
+                radial-gradient(ellipse at 90% 80%, rgba(14,165,233,.12), transparent 45%), #061326;
+            --glass-base: rgba(6, 24, 47, .90);
+            --glass-panel: rgba(12, 34, 64, .86);
+            --glass-card: rgba(20, 47, 81, .76);
+            --glass-card-hover: rgba(27, 61, 99, .94);
+            --glass-interactive: rgba(23, 53, 88, .94);
+            --glass-input: rgba(8, 27, 51, .92);
+            --glass-border: 1px solid rgba(104, 174, 247, .22);
+            --glass-border-light: 1px solid rgba(116, 170, 233, .14);
+            --glass-shadow: 0 18px 52px rgba(0, 8, 24, .26);
+            --text-primary: #eef7ff;
+            --text-secondary: #abc8e8;
+        }
+        [data-theme="light"] {
+            --bg-gradient: radial-gradient(ellipse at 10% 0%, rgba(125,211,252,.44), transparent 45%),
+                radial-gradient(ellipse at 100% 90%, rgba(191,219,254,.65), transparent 50%), #f2f8ff;
+            --glass-base: rgba(255,255,255,.9);
+            --glass-panel: rgba(255,255,255,.91);
+            --glass-card: rgba(244,249,255,.97);
+            --glass-card-hover: #eaf4ff;
+            --glass-interactive: #f1f7ff;
+            --glass-input: #fff;
+            --glass-border: 1px solid rgba(69,132,204,.22);
+            --glass-border-light: 1px solid rgba(74,137,210,.16);
+            --glass-shadow: 0 16px 42px rgba(48,105,175,.08);
+            --text-primary: #17385e;
+            --text-secondary: #567392;
+        }
+        body { line-height: 1.55; }
+        .ambient-orb { opacity: .13; filter: blur(145px); }
+        .orb-3 { display: none; }
+        .glass-header { box-shadow: 0 6px 32px rgba(0, 12, 34, .14); }
+        .glass-panel, .glass-card { border-radius: 22px; }
+        .glass-card:hover { transform: translateY(-3px); box-shadow: 0 16px 38px rgba(1, 17, 43, .14); }
+        .glass-btn, button { cursor: pointer; }
+        button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+            outline: 3px solid #38bdf8; outline-offset: 3px;
+        }
+        .topbar { min-height: 88px; height: auto; padding-top: 16px; padding-bottom: 16px; gap: 18px; }
+        .top-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 9px; }
+        .top-actions > button { min-height: 40px; white-space: nowrap; }
+        .brand-subtitle { color: var(--text-secondary); font-size: 10px; letter-spacing: .22em; font-weight: 700; text-transform: uppercase; }
+        .hero { position: relative; overflow: hidden; background: linear-gradient(112deg, #0c3164, #11549b 62%, #087eb3); border: 1px solid rgba(135,204,255,.25); box-shadow: 0 24px 55px rgba(2,27,76,.22); }
+        .hero::after { content: ''; position: absolute; width: 460px; height: 460px; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; right: -130px; top: -290px; box-shadow: 0 0 0 72px rgba(255,255,255,.035), 0 0 0 144px rgba(255,255,255,.028); pointer-events: none; }
+        .hero > * { position: relative; z-index: 1; }
+        .hero-eyebrow { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: #bfecff; font-weight: 800; }
+        .hero-title { font-size: clamp(1.65rem, 3vw, 2.55rem); line-height: 1.2; letter-spacing: -.035em; font-weight: 800; color: #fff; }
+        .hero-description { color: #d5efff; max-width: 570px; font-size: 13px; }
+        .primary-action { background: #fff; color: #14548b; border: 1px solid #fff; border-radius: 13px; font-weight: 800; box-shadow: 0 10px 25px rgba(0,26,65,.18); transition: transform .2s, box-shadow .2s; }
+        .primary-action:hover { transform: translateY(-2px); box-shadow: 0 15px 28px rgba(0,22,52,.24); }
+        .hero-reset { border: 1px solid rgba(225,245,255,.40); color: white; border-radius: 13px; background: rgba(255,255,255,.11); }
+        .hero-reset:hover { background: rgba(255,255,255,.2); }
+        .section-eyebrow { font-size: 11px; letter-spacing: .18em; font-weight: 800; color: #65bfff; text-transform: uppercase; }
+        [data-theme="light"] .section-eyebrow { color: #1764a4; }
+        #kpiContainer > button { min-height: 155px; padding: 23px; border-radius: 20px; position: relative; overflow: hidden; }
+        #kpiContainer > button::after { content: ''; width: 108px; height: 108px; position: absolute; right: -34px; bottom: -54px; border: 1px solid rgba(113,194,252,.14); border-radius: 50%; }
+        #kpiContainer .text-3xl { font-size: 2.35rem; letter-spacing: -.05em; margin-top: 16px; }
+        #productCatalogList details { background: var(--glass-card); border: var(--glass-border-light); }
+        #productCatalogList summary { transition: background .2s; }
+        #productCatalogList summary:hover { background: var(--glass-card-hover); }
+        #productCatalogList details[open] > summary { border-bottom: var(--glass-border-light); }
+        #productCatalogList details[open] summary .fa-chevron-down { transform: rotate(180deg); }
+        #productCatalogList summary .fa-chevron-down { transition: transform .2s; }
+        #productCatalogModal .glass-panel, #productDetailModal .glass-panel { box-shadow: 0 36px 90px rgba(0,8,29,.55); }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-thumb { border-radius: 20px; background: rgba(81,161,232,.4); }
+        /* Keep the dashboard itself within a laptop viewport. Long lists scroll in dialogs only. */
+        .topbar { min-height: 70px; padding-top: 10px; padding-bottom: 10px; gap: 14px; }
+        .topbar > .flex:first-child { flex-shrink: 0; }
+        .top-actions { flex-wrap: nowrap; gap: 6px; min-width: 0; }
+        .top-actions > button { min-height: 36px; padding: 8px 11px; font-size: 11px; }
+        .top-actions .nav-secondary-label { display: none; }
+        .dashboard-main { padding-top: 22px; padding-bottom: 22px; display: flex; flex-direction: column; gap: 18px; }
+        .hero { min-height: 164px; padding: 23px 28px; align-items: center; gap: 18px; }
+        .hero-title { font-size: clamp(1.5rem, 2.25vw, 2.05rem); }
+        .hero-description { margin-top: 4px; }
+        .hero-reset { padding: 10px 13px; }
+        .dashboard-section-head { margin-top: 1px; }
+        #kpiContainer { gap: 13px; }
+        #kpiContainer > button { min-height: 125px; padding: 18px; }
+        #kpiContainer .text-3xl { font-size: 2rem; margin-top: 10px; }
+        @media (min-width: 1025px) and (min-height: 640px) {
+            body { min-height: 100dvh; }
+            .dashboard-main { min-height: calc(100dvh - 70px); justify-content: center; }
+        }
+        @media (max-width: 1180px) {
+            .topbar { gap: 8px; }
+            .brand-subtitle { display: none; }
+            .top-actions > button { padding: 8px 9px; }
+        }
+        @media (max-width: 950px) {
+            .topbar { align-items: stretch; flex-direction: column; }
+            .top-actions { overflow-x: auto; justify-content: flex-start; padding-bottom: 3px; }
+        }
+        @media (max-width: 640px) {
+            .topbar { padding: 12px 0; }
+            .hero { padding: 22px; align-items: flex-start; }
+            .hero-description { font-size: 12px; }
+            .dashboard-main { gap: 16px; }
+            #kpiContainer { gap: 10px; }
+            #kpiContainer > button { min-height: 112px; padding: 14px; }
+            #kpiContainer .text-3xl { font-size: 1.7rem; }
+        }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+        .ai-output { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+        .ai-pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(125,211,252,.25); background: rgba(14,165,233,.10); color: #7dd3fc; border-radius: 99px; padding: 5px 10px; font-size: 11px; }
+        [data-theme="light"] .ai-pill { color: #075985; }
+        /* Calm navigation: frequent tasks stay visible; setup actions live under More. */
+        .topbar { min-height: 78px; }
+        .top-actions { gap: 12px; overflow: visible; }
+        .top-actions > button { min-height: 42px; padding: 10px 16px; font-size: 12px; }
+        .nav-primary { background: linear-gradient(120deg,#0284c7,#2563eb) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 8px 20px rgba(2,132,199,.18); }
+        .nav-primary i { color: #fff !important; }
+        .nav-menu { position: relative; }
+        .nav-menu > summary { list-style: none; display: flex; align-items: center; gap: 9px; padding: 10px 15px; min-height: 42px; font-size: 12px; font-weight: 700; border-radius: 12px; user-select: none; cursor: pointer; }
+        .nav-menu > summary::-webkit-details-marker { display: none; }
+        .nav-menu[open] > summary { background: var(--glass-card-hover); }
+        .nav-menu-panel { position: absolute; right: 0; top: calc(100% + 11px); width: 250px; background: var(--glass-base); border: var(--glass-border); box-shadow: 0 26px 55px rgba(0,12,35,.3); border-radius: 18px; padding: 9px; z-index: 70; backdrop-filter: blur(28px); }
+        .nav-menu-panel button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 13px; font-size: 12px; border-radius: 10px; color: var(--text-primary); }
+        .nav-menu-panel button:hover { background: var(--glass-card-hover); }
+        .nav-menu-panel i { width: 18px; color: #38bdf8; }
+        .nav-menu-divider { border-top: var(--glass-border-light); margin: 6px 2px; }
+        .dashboard-main { max-width: 1120px; gap: 25px; }
+        .hero { min-height: 152px; background: linear-gradient(108deg, #0e386d, #125695); padding: 27px 33px; }
+        .hero-description { max-width: 600px; }
+        .hero::after { opacity: .45; }
+        .dashboard-section-head { margin-top: 6px; }
+        #kpiContainer { gap: 18px; }
+        #kpiContainer > button { min-height: 144px; padding: 22px; }
+        #kpiContainer .text-3xl { font-size: 2.2rem; }
+        @media (max-width: 950px) { .topbar { flex-direction: row; align-items: center; } .top-actions { overflow: visible; margin-left: auto; } }
+        @media (max-width: 760px) {
+            .topbar { flex-direction: column; align-items: stretch; }
+            .top-actions { margin-left: 0; justify-content: space-between; gap: 6px; }
+            .top-actions > button, .nav-menu > summary { font-size: 11px; padding: 9px; }
+            .hero { padding: 24px; }
+            .hero-eyebrow { letter-spacing: .12em; }
+        }
+    </style>
+</head>
+<body class="min-h-screen selection:bg-sky-500 selection:text-white antialiased relative">
+
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+
+    <!-- Header -->
+    <header class="glass-header sticky top-0 z-40">
+        <div class="topbar max-w-7xl mx-auto px-6 flex items-center justify-between relative z-10">
+            <div class="flex items-center space-x-4">
+                <div class="relative group">
+                    <div class="absolute -inset-0.5 bg-gradient-to-r from-sky-400 to-blue-600 rounded-xl blur opacity-60 group-hover:opacity-100 transition duration-300"></div>
+                    <div class="relative glass-btn w-11 h-11 rounded-xl font-mono text-xl font-black flex items-center justify-center text-sky-300">
+                        IQ
+                    </div>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-wider">BROADCAST<span class="text-sky-400 font-light">IQ</span></h1>
+                    <div class="brand-subtitle">Equipment intelligence</div>
+                </div>
+            </div>
+
+            <div class="top-actions">
+                <button onclick="openProductCatalog()" class="nav-primary glass-btn rounded-xl flex items-center gap-2" title="View and manage registered equipment">
+                    <i class="fa-solid fa-box-open"></i><span>Products</span>
+                </button>
+                <button type="button" onclick="openAiAssistant()" class="glass-btn rounded-xl flex items-center gap-2" title="Local AI troubleshooting assistant">
+                    <i class="fa-solid fa-robot text-sky-400"></i><span>AI Assistant</span>
+                </button>
+                <button onclick="openModal('maintenanceLogModal')" class="glass-btn rounded-xl flex items-center gap-2" title="Troubleshooting & Maintenance Log">
+                    <i class="fa-solid fa-screwdriver-wrench text-sky-400"></i>
+                    <span>Maintenance</span>
+                    <span id="navLogBadge" class="ml-1 px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 rounded-full font-mono">0</span>
+                </button>
+                <details class="nav-menu" id="navMoreMenu">
+                    <summary class="glass-btn"><i class="fa-solid fa-ellipsis text-sky-400"></i>More <i class="fa-solid fa-chevron-down text-[10px] opacity-60"></i></summary>
+                    <div class="nav-menu-panel">
+                        <button type="button" onclick="openNavAction('addItemModal')"><i class="fa-solid fa-plus"></i>Register Equipment Unit</button>
+                        <button type="button" onclick="openNavAction('addModelModal')"><i class="fa-solid fa-layer-group"></i>Add Equipment Model</button>
+                        <button type="button" onclick="openNavAction('addLocationModal')"><i class="fa-solid fa-location-dot"></i>Add Location</button>
+                        <div class="nav-menu-divider"></div>
+                        <button type="button" onclick="openNavAction('systemMgmtModal')"><i class="fa-solid fa-sliders"></i>System Management</button>
+                        <button type="button" onclick="toggleTheme(); closeNavMenu()"><i class="fa-solid fa-circle-half-stroke"></i>Switch Theme</button>
+                        <button type="button" onclick="confirmResetDashboard()"><i class="fa-solid fa-arrow-rotate-left"></i>Reset Demo Inventory</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="dashboard-main max-w-7xl mx-auto px-6 relative z-10">
+
+        <div class="hero rounded-3xl flex flex-col md:flex-row justify-between">
+            <div class="space-y-3">
+                <div class="hero-eyebrow"><i class="fa-solid fa-circle text-[7px] mr-2"></i>Broadcast operations / Overview</div>
+                <h2 class="hero-title">Your equipment, all in one place.</h2>
+                <p class="hero-description">A clearer view of your broadcast inventory. Track availability, manage deployments and keep maintenance under control.</p>
+            </div>
+            <div class="hidden lg:flex items-center gap-2 shrink-0 text-xs font-semibold text-sky-100/90"><i class="fa-solid fa-circle-check text-sky-200"></i>Equipment overview</div>
+        </div>
+
+        <!-- Interactive KPI Cards -->
+        <div class="dashboard-section-head flex items-end justify-between gap-4">
+            <div><div class="section-eyebrow">Live inventory snapshot</div><h3 class="text-xl font-extrabold tracking-tight mt-1">Equipment overview</h3></div>
+            <p class="text-xs opacity-60 hidden sm:block">Select a card to view matching units <i class="fa-solid fa-arrow-up-right-from-square ml-1"></i></p>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-5" id="kpiContainer"></div>
+
+    </main>
+
+    <!-- Maintenance & Troubleshooting Log Modal -->
+    <div id="maintenanceLogModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="glass-panel rounded-3xl max-w-3xl w-full p-6 shadow-2xl space-y-5 border-amber-500/30 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-amber-500/20 pb-4 shrink-0">
+                <div>
+                    <h3 class="font-bold text-base text-amber-400 flex items-center gap-2">
+                        <i class="fa-solid fa-screwdriver-wrench"></i> Maintenance & Troubleshooting History
+                    </h3>
+                    <p class="text-xs opacity-70 mt-0.5">Comprehensive audit trail of reported issues, diagnostic timelines, and repair resolutions.</p>
+                </div>
+                <button onclick="closeModal('maintenanceLogModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <!-- Scrollable Log Container -->
+            <div id="troubleshootLogList" class="space-y-3 overflow-y-auto pr-2 grow"></div>
+
+            <div class="flex justify-end border-t border-amber-500/20 pt-4 shrink-0">
+                <button type="button" onclick="closeModal('maintenanceLogModal')" class="glass-btn px-5 py-2.5 text-xs rounded-xl">Close Log</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Data Management Modal -->
+    <div id="systemMgmtModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="glass-panel rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 border-rose-500/30">
+            <div class="flex justify-between items-center border-b border-rose-500/20 pb-4">
+                <div>
+                    <h3 class="font-bold text-base text-rose-400 flex items-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i> System Data Management
+                    </h3>
+                    <p class="text-xs opacity-70 mt-0.5">Remove unused locations, equipment models, and registered units.</p>
+                </div>
+                <button onclick="closeModal('systemMgmtModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-xs text-rose-400 opacity-70"></i>
+                <input type="text" id="deleteSearchInput" oninput="filterDeleteDropdowns()" placeholder="Search location, model, or asset tag to remove..." 
+                       class="glass-input text-xs rounded-xl block w-full pl-9 pr-4 py-2.5 outline-none border-rose-500/30 focus:border-rose-400">
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card p-4 rounded-2xl space-y-2">
+                    <span class="text-xs font-semibold text-rose-300 block"><i class="fa-solid fa-location-dot mr-1"></i> Remove Location</span>
+                    <select id="deleteLocationSelect" class="glass-input text-xs rounded-xl block w-full p-2.5 outline-none mb-2"></select>
+                    <button onclick="deleteSelectedLocation()" class="w-full py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl transition">
+                        Delete Location
+                    </button>
+                </div>
+
+                <div class="glass-card p-4 rounded-2xl space-y-2">
+                    <span class="text-xs font-semibold text-rose-300 block"><i class="fa-solid fa-layer-group mr-1"></i> Remove Equipment Model</span>
+                    <select id="deleteModelSelect" class="glass-input text-xs rounded-xl block w-full p-2.5 outline-none mb-2"></select>
+                    <button onclick="deleteSelectedModel()" class="w-full py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl transition">
+                        Delete Model
+                    </button>
+                </div>
+
+                <div class="glass-card p-4 rounded-2xl space-y-2">
+                    <span class="text-xs font-semibold text-rose-300 block"><i class="fa-solid fa-barcode mr-1"></i> Remove Registered Asset</span>
+                    <select id="deleteAssetSelect" class="glass-input text-xs rounded-xl block w-full p-2.5 outline-none mb-2"></select>
+                    <button onclick="deleteSelectedAsset()" class="w-full py-2 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl transition">
+                        Delete Asset
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-end border-t border-rose-500/20 pt-4">
+                <button type="button" onclick="closeModal('systemMgmtModal')" class="glass-btn px-5 py-2.5 text-xs rounded-xl">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="addLocationModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b border-sky-500/20 pb-4">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-location-dot text-sky-400"></i> Register Location
+                </h3>
+                <button onclick="closeModal('addLocationModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="addLocationForm" onsubmit="submitNewLocation(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Location Name *</label>
+                    <input type="text" id="newLocationName" required placeholder="e.g., Studio C, OB Truck 2" class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Facility / Designation Details</label>
+                    <input type="text" id="newLocationDesc" placeholder="e.g., Secondary production hub" class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-sky-500/20">
+                    <button type="button" onclick="closeModal('addLocationModal')" class="glass-btn px-4 py-2.5 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl shadow-lg shadow-sky-600/30">Save Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="addModelModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b border-sky-500/20 pb-4">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-sky-400"></i> Add Hardware Classification
+                </h3>
+                <button onclick="closeModal('addModelModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="addModelForm" onsubmit="submitNewModel(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Model Code / Reference *</label>
+                    <input type="text" id="newModelId" required placeholder="e.g., MOD-900" class="glass-input text-xs rounded-xl block w-full p-3 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Model Name *</label>
+                    <input type="text" id="newModelName" required placeholder="e.g., Blackmagic Studio Camera 4K" class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Category *</label>
+                    <select id="newModelCategory" required class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                        <option value="" class="bg-slate-900 text-white">Select Category...</option>
+                        <option value="Video Production" class="bg-slate-900 text-white">Video Production</option>
+                        <option value="Audio Engineering" class="bg-slate-900 text-white">Audio Engineering</option>
+                        <option value="Field Transmission" class="bg-slate-900 text-white">Field Transmission</option>
+                        <option value="Lighting & Power" class="bg-slate-900 text-white">Lighting & Power</option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-sky-500/20">
+                    <button type="button" onclick="closeModal('addModelModal')" class="glass-btn px-4 py-2.5 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl shadow-lg shadow-sky-600/30">Save Model</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="addItemModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b border-sky-500/20 pb-4">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-barcode text-sky-400"></i> Register Hardware Unit
+                </h3>
+                <button onclick="closeModal('addItemModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="addItemForm" onsubmit="submitNewItem(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Equipment Model *</label>
+                    <select id="newItemModelSelect" required class="glass-input text-xs rounded-xl block w-full p-3 outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Serial Number / Asset Tag *</label>
+                    <input type="text" id="newItemSerial" required placeholder="e.g., SN-CAM-8821" class="glass-input text-xs rounded-xl block w-full p-3 outline-none font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Assigned Location *</label>
+                    <select id="newItemLocation" required class="glass-input text-xs rounded-xl block w-full p-3 outline-none"></select>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-sky-500/20">
+                    <button type="button" onclick="closeModal('addItemModal')" class="glass-btn px-4 py-2.5 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl shadow-lg shadow-sky-600/30">Register Unit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="maintModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-[70]">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border-rose-500/30">
+            <div class="flex justify-between items-center border-b border-rose-500/20 pb-4">
+                <h3 class="font-bold text-base text-rose-400 flex items-center gap-2">
+                    <i class="fa-solid fa-wrench"></i> Log Technical Issue
+                </h3>
+                <button onclick="closeModal('maintModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="maintItemInfo" class="glass-card p-3.5 rounded-xl text-xs space-y-1"></div>
+            <form id="maintForm" onsubmit="submitMaintenanceLog(event)" class="space-y-4">
+                <input type="hidden" id="maintItemId">
+                <div>
+                    <label class="block text-xs font-medium text-rose-300 mb-1.5">Reported by *</label>
+                    <input type="text" id="maintReporter" required maxlength="100" placeholder="Name of reporting staff" class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-rose-300 mb-1.5">Issue Description *</label>
+                    <input type="text" id="maintIssue" required placeholder="e.g., Loss of signal on SDI port" class="glass-input text-xs rounded-xl block w-full p-3 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-rose-300 mb-1.5">Action Plan / Status Details *</label>
+                    <textarea id="maintAction" required rows="3" placeholder="e.g., Transferred to engineering bench for diagnostic" class="glass-input text-xs rounded-xl block w-full p-3 outline-none"></textarea>
+                </div>
+                <p class="text-xs opacity-70">Record planned actions here. AI suggestions must be reviewed and should not be recorded as completed repairs.</p>
+                <div class="flex justify-end gap-2 pt-3 border-t border-sky-500/20">
+                    <button type="button" onclick="closeModal('maintModal')" class="glass-btn px-4 py-2.5 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl shadow-lg shadow-rose-600/30">Flag Defective</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- A repair requires documented work and a passed functional check. -->
+    <div id="repairModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-[70]" role="dialog" aria-modal="true" aria-label="Complete equipment repair">
+      <div class="glass-panel rounded-3xl max-w-md w-full p-6 max-h-[92vh] overflow-y-auto space-y-4">
+        <div class="flex justify-between items-center"><h3 class="font-bold text-lg"><i class="fa-solid fa-screwdriver-wrench text-emerald-400 mr-2"></i>Complete Repair</h3><button type="button" onclick="closeModal('repairModal')" class="glass-btn rounded-lg px-3 py-2" aria-label="Close repair form"><i class="fa-solid fa-xmark"></i></button></div>
+        <p id="repairItemInfo" class="text-xs opacity-75"></p>
+        <form id="repairForm" onsubmit="submitRepair(event)" class="space-y-4">
+          <input type="hidden" id="repairItemId">
+          <label class="block text-xs font-semibold">Repair performed *<textarea id="repairWork" required minlength="5" maxlength="1500" rows="3" placeholder="What was actually repaired or corrected?" class="glass-input w-full rounded-xl p-3 mt-2 text-sm"></textarea></label>
+          <label class="block text-xs font-semibold">Technician / verified by *<input id="repairTechnician" required maxlength="100" class="glass-input w-full rounded-xl p-3 mt-2 text-sm" placeholder="Name of technician"></label>
+          <label class="flex items-start gap-3 text-xs"><input type="checkbox" id="repairTestPassed" required class="mt-0.5"><span>Functional testing passed and equipment is safe to return to service.</span></label>
+          <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="closeModal('repairModal')" class="glass-btn rounded-xl px-4 py-2.5 text-xs">Cancel</button><button type="submit" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold rounded-xl px-4 py-2.5 text-xs">Confirm Repair</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div id="deployModal" class="fixed inset-0 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4 z-[70]">
+        <div class="glass-panel rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b border-sky-500/20 pb-4">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-truck-ramp-box text-sky-400"></i> Dispatch Equipment
+                </h3>
+                <button onclick="closeModal('deployModal')" class="opacity-50 hover:opacity-100"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="deployItemInfo" class="glass-card p-3.5 rounded-xl text-xs space-y-1"></div>
+            <form id="deployForm" onsubmit="submitDeployment(event)" class="space-y-4">
+                <input type="hidden" id="deployItemId">
+                <div>
+                    <label class="block text-xs font-medium opacity-80 mb-1.5">Destination Location *</label>
+                    <select id="deployLocation" required class="glass-input text-xs rounded-xl block w-full p-3 outline-none"></select>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-sky-500/20">
+                    <button type="button" onclick="closeModal('deployModal')" class="glass-btn px-4 py-2.5 text-xs rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs bg-sky-600 hover:bg-sky-500 text-white font-medium rounded-xl shadow-lg shadow-sky-600/30">Confirm Dispatch</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Local Ollama AI Assistant; recommendations are reviewed before a fault is recorded. -->
+    <div id="aiAssistantModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="AI Equipment Troubleshooting Assistant">
+      <div class="glass-panel rounded-3xl w-full max-w-3xl p-5 sm:p-7 max-h-[92vh] flex flex-col gap-4">
+        <div class="flex items-start justify-between gap-3">
+          <div><div class="ai-pill mb-2"><i class="fa-solid fa-microchip"></i> Local Ollama · Qwen3 0.6B (4 GB mode)</div>
+            <h3 class="font-extrabold text-xl"><i class="fa-solid fa-robot text-sky-400 mr-2"></i>AI Troubleshooting Assistant</h3>
+            <p class="text-xs opacity-70 mt-1">Analyze a reported issue, then review suggestions before saving a maintenance report.</p>
+          </div>
+          <button type="button" onclick="closeModal('aiAssistantModal')" class="glass-btn px-3 py-2 rounded-xl" aria-label="Close AI assistant"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="overflow-y-auto space-y-4 pr-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="text-xs font-semibold space-y-2"><span>Equipment unit</span>
+              <select id="aiEquipmentSelect" class="glass-input rounded-xl w-full p-3 text-sm" onchange="resetAiResult()"></select>
+            </label>
+            <div class="glass-card rounded-xl px-4 py-3 text-xs flex flex-col justify-center gap-1">
+              <span class="opacity-65">AI connection</span><span id="aiConnectionStatus" role="status" class="font-semibold">Not checked</span>
+            </div>
+          </div>
+          <label class="block text-xs font-semibold space-y-2"><span>Describe the symptoms</span>
+            <textarea id="aiIssueInput" rows="3" maxlength="2000" oninput="resetAiResult()" placeholder="Example: The camera powers on, but the external monitor displays no SDI signal." class="glass-input rounded-xl w-full p-3 text-sm outline-none"></textarea>
+          </label>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="aiAnalyzeButton" onclick="analyzeEquipmentWithAi()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl px-5 py-2.5 text-sm"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Analyze with AI</button>
+            <button type="button" onclick="checkOllamaConnection()" class="glass-btn rounded-xl px-4 py-2.5 text-xs">Test connection</button>
+          </div>
+          <div id="aiResultPanel" class="glass-card rounded-2xl p-4 space-y-3 hidden" aria-live="polite">
+            <div class="flex justify-between items-center gap-2"><h4 class="font-bold text-sm text-sky-300"><i class="fa-solid fa-lightbulb mr-2"></i>AI recommendations</h4><span class="text-[10px] opacity-60">For review only</span></div>
+            <div id="aiResultText" class="ai-output text-sm"></div>
+            <p class="text-xs opacity-65 border-t border-white/10 pt-3">AI can make mistakes. Confirm each step with equipment documentation and a qualified technician. Do not apply risky repair steps without authorization.</p>
+            <button type="button" id="aiSaveDraftButton" onclick="prepareAiMaintenanceDraft()" class="glass-btn rounded-xl px-4 py-2.5 text-xs font-bold"><i class="fa-solid fa-clipboard-check mr-2"></i>Review in Maintenance Report</button>
+          </div>
+          <p id="aiErrorText" class="hidden text-xs text-rose-300 bg-rose-900/20 border border-rose-500/30 p-3 rounded-xl" role="alert"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Catalog: view each registered equipment unit -->
+    <div id="productCatalogModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-50" role="dialog" aria-modal="true" aria-label="View Products">
+      <div class="glass-panel rounded-3xl w-full max-w-5xl p-6 max-h-[90vh] flex flex-col gap-5">
+        <div class="flex justify-between items-start gap-4">
+          <div><h3 class="font-bold text-xl flex items-center gap-2"><i class="fa-solid fa-box-open text-sky-400"></i> Product Inventory</h3><p class="text-xs opacity-70 mt-1">Products are grouped by name, with models and individual units underneath. Select a product to expand it.</p></div>
+          <button type="button" onclick="closeModal('productCatalogModal')" class="glass-btn rounded-lg px-3 py-2" aria-label="Close catalog"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="productCatalogSearch" type="search" oninput="renderProductCatalog()" placeholder="Search product, model, serial, location..." class="glass-input rounded-xl p-3 text-sm grow outline-none" aria-label="Search products">
+          <select id="productCatalogStatus" onchange="renderProductCatalog()" class="glass-input rounded-xl p-3 text-sm" aria-label="Filter by status"><option value="ALL">All statuses</option><option value="Available">Available</option><option value="In-Use">In-Use</option><option value="Defective">Defective</option></select>
+        </div>
+        <div id="productCatalogCount" class="text-xs opacity-70"></div>
+        <div id="productCatalogNotice" role="status" aria-live="polite" class="hidden text-xs rounded-xl border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 p-3"></div>
+        <div id="productCatalogList" class="space-y-3 overflow-y-auto pr-1 pb-2"></div>
+      </div>
+    </div>
+
+    <!-- Individual equipment detail and available actions -->
+    <div id="productDetailModal" class="fixed inset-0 bg-black/75 backdrop-blur-md hidden flex items-center justify-center p-4 z-[60]" role="dialog" aria-modal="true" aria-label="Product Details">
+      <div class="glass-panel rounded-3xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto space-y-5">
+        <div class="flex justify-between items-center gap-4"><h3 class="font-bold text-xl"><i class="fa-solid fa-box text-sky-400 mr-2"></i>Product Details</h3><button type="button" onclick="closeModal('productDetailModal')" class="glass-btn rounded-lg px-3 py-2" aria-label="Close product details"><i class="fa-solid fa-xmark"></i></button></div>
+        <div id="productDetailContent"></div>
+        <div id="productDetailActions" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const INITIAL_STATE = {
+            theme: "dark",
+            locations: [
+                { id: "LOC-001", name: "Equipment Locker", desc: "Main Storage Facility" },
+                { id: "LOC-002", name: "Studio A", desc: "Main Broadcast Studio" },
+                { id: "LOC-003", name: "Studio B", desc: "News & Talk Desk" },
+                { id: "LOC-004", name: "OB Van 1", desc: "Outside Broadcast Truck" },
+                { id: "LOC-005", name: "Bench Repair", desc: "Maintenance Locker" }
+            ],
+            models: [
+                { id: "MOD-001", name: "Sony FX6 Cinema Camera", category: "Video Production" },
+                { id: "MOD-002", name: "Sennheiser EW-DX Receiver", category: "Audio Engineering" },
+                { id: "MOD-003", name: "LiveU LU800 Field Encoder", category: "Field Transmission" }
+            ],
+            items: [
+                { id: "ITM-101", modelId: "MOD-001", serial: "SN-FX6-9021", status: "Available", location: "Equipment Locker" },
+                { id: "ITM-102", modelId: "MOD-001", serial: "SN-FX6-9022", status: "In-Use", location: "Studio A" },
+                { id: "ITM-103", modelId: "MOD-001", serial: "SN-FX6-9023", status: "Defective", location: "Bench Repair" },
+                { id: "ITM-201", modelId: "MOD-002", serial: "SN-SEN-4011", status: "In-Use", location: "OB Van 1" },
+                { id: "ITM-301", modelId: "MOD-003", serial: "SN-LU-8801", status: "Available", location: "Equipment Locker" }
+            ],
+            logs: [
+                { 
+                    id: "LOG-001",
+                    itemId: "ITM-103", 
+                    issue: "SDI Output port 1 intermittent signal loss", 
+                    action: "Flagged for bench testing and port replacement.",
+                    status: "Active Issue",
+                    troubleshotAt: "2026-04-10 14:30",
+                    repairedAt: null
+                }
+            ]
+        };
+
+        let state;
+        try {
+            const saved = JSON.parse(localStorage.getItem('broadcastIqGlassState'));
+            state = saved && Array.isArray(saved.items) && Array.isArray(saved.models) && Array.isArray(saved.locations) && Array.isArray(saved.logs)
+                ? saved : JSON.parse(JSON.stringify(INITIAL_STATE));
+        } catch (error) {
+            state = JSON.parse(JSON.stringify(INITIAL_STATE));
+            alert('Saved inventory data could not be read. Demo inventory was loaded; check your browser storage before making changes.');
+        }
+        let activeStatusFilter = 'ALL';
+
+        if (!state.theme) state.theme = "dark";
+        document.documentElement.setAttribute('data-theme', state.theme);
+
+        const newRecordId = prefix => `${prefix}-${Date.now()}-${crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10)}`;
+        const trimmed = value => String(value ?? '').trim();
+        const equalsIgnoreCase = (a, b) => trimmed(a).toLowerCase() === trimmed(b).toLowerCase();
+        const localTimestamp = () => {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
+        function saveState() {
+            try { localStorage.setItem('broadcastIqGlassState', JSON.stringify(state)); }
+            catch (error) { alert('Changes could not be saved in this browser. Please check that browser storage is enabled.'); }
+            render();
+        }
+
+        function toggleTheme() {
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', state.theme);
+            saveState();
+        }
+
+        function resetData() {
+            state = JSON.parse(JSON.stringify(INITIAL_STATE));
+            activeStatusFilter = 'ALL';
+            document.documentElement.setAttribute('data-theme', state.theme);
+            saveState();
+        }
+
+        function filterModels() { openProductCatalog(); }
+
+        function setStatusFilter(status) {
+            activeStatusFilter = status;
+            openProductCatalog();
+            document.getElementById('productCatalogStatus').value = status;
+            renderProductCatalog();
+            renderKPIs();
+        }
+
+        function filterDeleteDropdowns() {
+            const query = (document.getElementById('deleteSearchInput')?.value || '').toLowerCase();
+            
+            const filteredLocs = state.locations.filter(l => l.name.toLowerCase().includes(query) || l.id.toLowerCase().includes(query));
+            document.getElementById('deleteLocationSelect').innerHTML = filteredLocs.length 
+                ? filteredLocs.map(l => `<option value="${htmlSafe(l.id)}" class="bg-slate-900 text-white">${htmlSafe(l.name)}</option>`).join('')
+                : `<option value="" class="bg-slate-900 text-white" disabled>No matching location</option>`;
+
+            const filteredModels = state.models.filter(m => m.name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query));
+            document.getElementById('deleteModelSelect').innerHTML = filteredModels.length 
+                ? filteredModels.map(m => `<option value="${htmlSafe(m.id)}" class="bg-slate-900 text-white">${htmlSafe(m.name)} (${htmlSafe(m.id)})</option>`).join('')
+                : `<option value="" class="bg-slate-900 text-white" disabled>No matching model</option>`;
+
+            const filteredItems = state.items.filter(i => {
+                const model = state.models.find(m => m.id === i.modelId);
+                const modelName = model ? model.name : '';
+                return i.serial.toLowerCase().includes(query) || i.id.toLowerCase().includes(query) || modelName.toLowerCase().includes(query);
+            });
+            document.getElementById('deleteAssetSelect').innerHTML = filteredItems.length
+                ? filteredItems.map(i => {
+                    const m = state.models.find(mod => mod.id === i.modelId);
+                    return `<option value="${htmlSafe(i.id)}" class="bg-slate-900 text-white">${htmlSafe(i.serial)} - ${htmlSafe(m?.name || '')}</option>`;
+                }).join('')
+                : `<option value="" class="bg-slate-900 text-white" disabled>No matching asset</option>`;
+        }
+
+        function renderKPIs() {
+            const total = state.items.length;
+            const available = state.items.filter(i => i.status === 'Available').length;
+            const inUse = state.items.filter(i => i.status === 'In-Use').length;
+            const defective = state.items.filter(i => i.status === 'Defective').length;
+
+            document.getElementById('kpiContainer').innerHTML = `
+                <button onclick="setStatusFilter('ALL')" class="glass-card p-5 rounded-3xl border-l-4 border-l-slate-400 text-left w-full cursor-pointer transition ${activeStatusFilter === 'ALL' ? 'active-kpi' : ''}">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs font-bold uppercase tracking-wider opacity-80">Total Units</span>
+                        <i class="fa-solid fa-boxes-stacked opacity-50 text-sm"></i>
+                    </div>
+                    <p class="text-3xl font-extrabold mt-2">${total}</p>
+                </button>
+                <button onclick="setStatusFilter('Available')" class="glass-card p-5 rounded-3xl border-l-4 border-l-sky-400 text-left w-full cursor-pointer transition ${activeStatusFilter === 'Available' ? 'active-kpi' : ''}">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs text-sky-400 font-bold uppercase tracking-wider">Available</span>
+                        <i class="fa-solid fa-circle-check text-sky-400 text-sm"></i>
+                    </div>
+                    <p class="text-3xl font-extrabold text-sky-400 mt-2">${available}</p>
+                </button>
+                <button onclick="setStatusFilter('In-Use')" class="glass-card p-5 rounded-3xl border-l-4 border-l-blue-500 text-left w-full cursor-pointer transition ${activeStatusFilter === 'In-Use' ? 'active-kpi' : ''}">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs text-blue-400 font-bold uppercase tracking-wider">In-Use</span>
+                        <i class="fa-solid fa-satellite-dish text-blue-400 text-sm"></i>
+                    </div>
+                    <p class="text-3xl font-extrabold text-blue-300 mt-2">${inUse}</p>
+                </button>
+                <button onclick="setStatusFilter('Defective')" class="glass-card p-5 rounded-3xl border-l-4 border-l-rose-500 text-left w-full cursor-pointer transition ${activeStatusFilter === 'Defective' ? 'active-kpi' : ''}">
+                    <div class="flex justify-between items-start">
+                        <span class="text-xs text-rose-400 font-bold uppercase tracking-wider">Defective</span>
+                        <i class="fa-solid fa-triangle-exclamation text-rose-500 text-sm"></i>
+                    </div>
+                    <p class="text-3xl font-extrabold text-rose-400 mt-2">${defective}</p>
+                </button>
+            `;
+        }
+
+        function renderTroubleshootLogs() {
+            const container = document.getElementById('troubleshootLogList');
+            const navBadge = document.getElementById('navLogBadge');
+            
+            if (!container) return;
+
+            navBadge.textContent = state.logs.length;
+
+            if (state.logs.length === 0) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-xs opacity-50 glass-card rounded-2xl">
+                        No historical maintenance or troubleshooting records found.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.logs.map(log => {
+                const item = state.items.find(i => i.id === log.itemId);
+                const model = item ? state.models.find(m => m.id === item.modelId) : null;
+                const isRepaired = log.status === 'Repaired / Back in Service';
+
+                return `
+                    <div class="glass-card p-4 rounded-2xl space-y-2 border-l-4 ${isRepaired ? 'border-l-emerald-500' : 'border-l-rose-500'} transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-xs ${isRepaired ? 'text-emerald-400' : 'text-rose-400'}">${htmlSafe(model?.name || 'Unknown Equipment')}</span>
+                                <span class="font-mono text-[11px] opacity-60">(${htmlSafe(item?.serial || 'N/A')})</span>
+                            </div>
+                            <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${isRepaired ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                                ${htmlSafe(log.status)}
+                            </span>
+                        </div>
+                        <div class="text-xs space-y-1.5 pt-1">
+                            <p><strong class="text-rose-400 font-medium">Issue Description:</strong> ${htmlSafe(log.issue)}</p>
+                            <p class="opacity-80"><strong class="text-sky-300 font-medium">Action Plan:</strong> ${htmlSafe(log.action)}</p>
+                            ${log.reportedBy ? `<p class="opacity-80"><strong>Reported by:</strong> ${htmlSafe(log.reportedBy)}</p>` : ''}
+                            ${isRepaired && log.repairWork ? `<p class="opacity-80"><strong class="text-emerald-400">Repair performed:</strong> ${htmlSafe(log.repairWork)} · <strong>Verified by:</strong> ${htmlSafe(log.repairedBy || 'N/A')}</p>` : ''}
+                        </div>
+                        <div class="flex items-center gap-4 text-[11px] font-mono opacity-60 pt-2 border-t border-white/5">
+                            <span><i class="fa-regular fa-clock mr-1 text-amber-400"></i> Reported: ${htmlSafe(log.troubleshotAt || 'N/A')}</span>
+                            ${isRepaired ? `<span class="text-emerald-400"><i class="fa-solid fa-check-double mr-1"></i> Repaired: ${htmlSafe(log.repairedAt || 'N/A')}</span>` : `<span class="text-rose-400"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Under Repair</span>`}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function populateDropdowns() {
+            const modelSelect = document.getElementById('newItemModelSelect');
+            if (modelSelect) modelSelect.innerHTML = state.models.map(m => `<option value="${htmlSafe(m.id)}" class="bg-slate-900 text-white">${htmlSafe(m.name)}</option>`).join('');
+
+            const locationOptions = state.locations.map(l => `<option value="${htmlSafe(l.name)}" class="bg-slate-900 text-white">${htmlSafe(l.name)}</option>`).join('');
+            document.getElementById('newItemLocation').innerHTML = locationOptions;
+            document.getElementById('deployLocation').innerHTML = locationOptions;
+
+            filterDeleteDropdowns();
+        }
+
+        /* Deletion Action Handlers */
+        function deleteAssetItem(id) {
+            state.items = state.items.filter(i => i.id !== id);
+            state.logs = state.logs.filter(l => l.itemId !== id);
+            saveState();
+        }
+
+        function deleteSelectedAsset() {
+            const id = document.getElementById('deleteAssetSelect').value;
+            if (!id) return;
+            if (state.logs.some(log => log.itemId === id)) {
+                alert('This unit has maintenance history and cannot be deleted without losing the audit trail. Keep the unit registered for record integrity.');
+                return;
+            }
+            const item = state.items.find(i => i.id === id);
+            if (item?.status !== 'Available') {
+                alert('Only Available equipment without maintenance records can be deleted.');
+                return;
+            }
+            if (confirm("Are you sure you want to delete this asset unit?")) {
+                deleteAssetItem(id);
+            }
+        }
+
+        function deleteSelectedLocation() {
+            const locId = document.getElementById('deleteLocationSelect').value;
+            const locObj = state.locations.find(l => l.id === locId);
+            if (!locObj) return;
+
+            const assignedCount = state.items.filter(i => equalsIgnoreCase(i.location, locObj.name)).length;
+            if (assignedCount) {
+                alert(`Cannot delete "${locObj.name}" while ${assignedCount} equipment unit(s) are assigned there. Relocate them first.`);
+                return;
+            }
+
+            if (confirm(`Delete location "${locObj.name}"?`)) {
+                state.locations = state.locations.filter(l => l.id !== locId);
+                saveState();
+            }
+        }
+
+        function deleteSelectedModel() {
+            const modelId = document.getElementById('deleteModelSelect').value;
+            const modelObj = state.models.find(m => m.id === modelId);
+            if (!modelObj) return;
+
+            const itemsAssigned = state.items.filter(i => i.modelId === modelId).length;
+            if (itemsAssigned > 0) {
+                alert(`Cannot delete model "${modelObj.name}". Please delete all ${itemsAssigned} assigned unit(s) first.`);
+                return;
+            }
+
+            if (confirm(`Delete equipment model "${modelObj.name}"?`)) {
+                state.models = state.models.filter(m => m.id !== modelId);
+                saveState();
+            }
+        }
+
+        function render() {
+            renderKPIs();
+            renderTroubleshootLogs();
+            populateDropdowns();
+        }
+
+        /* Modal Toggle Handlers */
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        /* Form Processing Handlers */
+        function submitNewLocation(e) {
+            e.preventDefault();
+            const name = trimmed(document.getElementById('newLocationName').value);
+            const desc = trimmed(document.getElementById('newLocationDesc').value);
+            if (!name) return alert('Enter a location name.');
+            if (state.locations.some(l => equalsIgnoreCase(l.name, name))) return alert('That location already exists.');
+            state.locations.push({ id: newRecordId('LOC'), name, desc });
+            closeModal('addLocationModal');
+            document.getElementById('addLocationForm').reset();
+            saveState();
+        }
+
+        function submitNewModel(e) {
+            e.preventDefault();
+            const id = trimmed(document.getElementById('newModelId').value);
+            const name = trimmed(document.getElementById('newModelName').value);
+            const category = document.getElementById('newModelCategory').value;
+            if (!id || !name || !category) return alert('Complete all required model details.');
+            if (state.models.some(m => equalsIgnoreCase(m.id, id))) return alert('This model code already exists. Use a unique model code.');
+            if (state.models.some(m => equalsIgnoreCase(m.name, name))) return alert('A model with this name already exists. Register another unit under the existing model.');
+            state.models.push({ id, name, category });
+            closeModal('addModelModal');
+            document.getElementById('addModelForm').reset();
+            saveState();
+        }
+
+        function submitNewItem(e) {
+            e.preventDefault();
+            const modelId = document.getElementById('newItemModelSelect').value;
+            const serial = trimmed(document.getElementById('newItemSerial').value);
+            const location = document.getElementById('newItemLocation').value;
+            if (!serial || !state.models.some(m => m.id === modelId) || !state.locations.some(l => l.name === location)) return alert('Enter a serial number and select a valid model and location.');
+            if (state.items.some(i => equalsIgnoreCase(i.serial, serial))) return alert('This serial number or asset tag is already registered.');
+            state.items.push({ id: newRecordId('ITM'), modelId, serial, status: 'Available', location });
+            closeModal('addItemModal');
+            document.getElementById('addItemForm').reset();
+            saveState();
+        }
+
+        function openMaintModal(itemId) {
+            const item = state.items.find(i => i.id === itemId);
+            if (!item || item.status === 'Defective' || state.logs.some(log => log.itemId === itemId && log.status === 'Active Issue')) {
+                alert('This unit already has an active fault or is not available for another fault report.');
+                return;
+            }
+            const model = state.models.find(m => m.id === item.modelId);
+            document.getElementById('maintItemId').value = itemId;
+            document.getElementById('maintItemInfo').innerHTML = `<strong>Unit:</strong> ${htmlSafe(model?.name || 'Unknown')} (${htmlSafe(item.serial)})<br><strong>Location:</strong> ${htmlSafe(item.location)}`;
+            openModal('maintModal');
+        }
+
+        function submitMaintenanceLog(e) {
+            e.preventDefault();
+            const itemId = document.getElementById('maintItemId').value;
+            const issue = trimmed(document.getElementById('maintIssue').value);
+            const action = trimmed(document.getElementById('maintAction').value);
+            const reportedBy = trimmed(document.getElementById('maintReporter').value);
+            const timestamp = localTimestamp();
+            
+            const item = state.items.find(i => i.id === itemId);
+            if (!item || item.status === 'Defective' || state.logs.some(log => log.itemId === itemId && log.status === 'Active Issue')) return alert('Fault cannot be submitted: this equipment already has an active fault.');
+            if (!issue || !action || !reportedBy) return alert('Complete the reporter, issue, and action plan fields.');
+            item.status = 'Defective';
+            
+            state.logs.unshift({ 
+                id: newRecordId('LOG'),
+                itemId, 
+                issue, 
+                action,
+                reportedBy,
+                status: 'Active Issue',
+                troubleshotAt: timestamp,
+                repairedAt: null
+            });
+            closeModal('maintModal');
+            document.getElementById('maintForm').reset();
+            saveState();
+        }
+
+        function openDeployModal(itemId) {
+            const item = state.items.find(i => i.id === itemId);
+            if (!item || item.status !== 'Available') return alert('Only Available equipment can be dispatched.');
+            const model = state.models.find(m => m.id === item.modelId);
+            document.getElementById('deployItemId').value = itemId;
+            document.getElementById('deployItemInfo').innerHTML = `<strong>Unit:</strong> ${htmlSafe(model?.name || 'Unknown')} (${htmlSafe(item.serial)})`;
+            openModal('deployModal');
+        }
+
+        function submitDeployment(e) {
+            e.preventDefault();
+            const itemId = document.getElementById('deployItemId').value;
+            const location = document.getElementById('deployLocation').value;
+            
+            const item = state.items.find(i => i.id === itemId);
+            if (!item || item.status !== 'Available') return alert('This unit is no longer Available. Refresh the catalog.');
+            if (!state.locations.some(l => l.name === location)) return alert('Choose a valid destination location.');
+            item.status = 'In-Use';
+            item.location = location;
+            
+            closeModal('deployModal');
+            document.getElementById('deployForm').reset();
+            saveState();
+            // The catalog stays open beneath the dispatch dialog. Reflect the
+            // updated location and status immediately, with visible feedback.
+            if (!document.getElementById('productCatalogModal').classList.contains('hidden')) {
+                const notice = document.getElementById('productCatalogNotice');
+                notice.textContent = `${item.serial} dispatched to ${location}. Status: In-Use.`;
+                notice.classList.remove('hidden');
+            }
+        }
+
+        function checkInItem(id) {
+            const item = state.items.find(i => i.id === id);
+            if (!item || item.status !== 'In-Use') return alert('Only In-Use equipment can be checked in.');
+            if (!state.locations.some(l => l.name === 'Equipment Locker')) return alert('Add an Equipment Locker location before checking in units.');
+            item.status = 'Available';
+            item.location = 'Equipment Locker';
+            saveState();
+        }
+
+        function openRepairModal(id) {
+            const item = state.items.find(i => i.id === id);
+            if (!item || item.status !== 'Defective') return alert('Only Defective equipment can be repaired.');
+            document.getElementById('repairItemId').value = id;
+            const model = state.models.find(m => m.id === item.modelId);
+            document.getElementById('repairItemInfo').textContent = `${model?.name || 'Equipment'} · ${item.serial}`;
+            document.getElementById('repairForm').reset();
+            openModal('repairModal');
+        }
+
+        function submitRepair(e) {
+            e.preventDefault();
+            const id = document.getElementById('repairItemId').value;
+            const item = state.items.find(i => i.id === id);
+            if (!item || item.status !== 'Defective') return alert('This equipment is no longer marked Defective.');
+            const repairWork = trimmed(document.getElementById('repairWork').value);
+            const technician = trimmed(document.getElementById('repairTechnician').value);
+            if (repairWork.length < 5 || !technician || !document.getElementById('repairTestPassed').checked) return alert('Enter repair details and confirm the functional test passed.');
+            const activeLogs = state.logs.filter(l => l.itemId === id && l.status === 'Active Issue');
+            const timestamp = localTimestamp();
+            // Legacy inventory may contain multiple active logs; resolve every one together.
+            activeLogs.forEach(log => {
+                log.status = 'Repaired / Back in Service';
+                log.repairedAt = timestamp;
+                log.repairWork = repairWork;
+                log.repairedBy = technician;
+                log.testPassed = true;
+            });
+            if (!activeLogs.length) {
+                state.logs.unshift({id: newRecordId('LOG'), itemId: id, issue: 'Legacy defective status (no issue record)', action: 'Repair completion recorded', status: 'Repaired / Back in Service', troubleshotAt: timestamp, repairedAt: timestamp, repairWork, repairedBy: technician, testPassed: true});
+            }
+            item.status = 'Available';
+            closeModal('repairModal');
+            saveState();
+        }
+
+        // Product catalog and detailed asset actions
+        let catalogModelFilter = null;
+        const htmlSafe = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+        const statusColor = status => status === 'Available' ? 'text-sky-400' : status === 'In-Use' ? 'text-blue-400' : 'text-rose-400';
+
+        function openProductCatalog(modelId = null) {
+            catalogModelFilter = modelId;
+            activeStatusFilter = 'ALL';
+            renderKPIs();
+            document.getElementById('productCatalogSearch').value = '';
+            document.getElementById('productCatalogStatus').value = 'ALL';
+            document.getElementById('productCatalogNotice').classList.add('hidden');
+            renderProductCatalog();
+            openModal('productCatalogModal');
+        }
+
+        // Preserve expanded product groups when status changes or inventory is updated.
+        const openCatalogGroups = new Set();
+        function rememberProductGroup(groupKey, expanded) {
+            if (expanded) openCatalogGroups.add(groupKey);
+            else openCatalogGroups.delete(groupKey);
+        }
+
+        function renderProductCatalog() {
+            const query = document.getElementById('productCatalogSearch').value.trim().toLowerCase();
+            const status = document.getElementById('productCatalogStatus').value;
+            const list = document.getElementById('productCatalogList');
+            const previousScroll = list.scrollTop;
+            const filtered = state.items.filter(item => {
+                const model = state.models.find(m => m.id === item.modelId);
+                return (!catalogModelFilter || item.modelId === catalogModelFilter) &&
+                    (status === 'ALL' || item.status === status) &&
+                    [item.serial, item.id, item.location, model?.name, model?.id, model?.category].some(v => String(v ?? '').toLowerCase().includes(query));
+            });
+
+            // Same-named products share one collapsible group, with models beneath.
+            const groups = new Map();
+            for (const item of filtered) {
+                const model = state.models.find(m => m.id === item.modelId);
+                const name = (model?.name || 'Unclassified product').trim();
+                const key = name.toLocaleLowerCase();
+                if (!groups.has(key)) groups.set(key, {name, models: new Map(), units: []});
+                const group = groups.get(key);
+                if (!group.models.has(item.modelId)) {
+                    group.models.set(item.modelId, {model, items: []});
+                }
+                group.models.get(item.modelId).items.push(item);
+                group.units.push(item);
+            }
+
+            const countText = `${groups.size} product group${groups.size === 1 ? '' : 's'} · ${filtered.length} unit${filtered.length === 1 ? '' : 's'}`;
+            document.getElementById('productCatalogCount').textContent = countText;
+            if (!groups.size) {
+                list.innerHTML = '<p class="opacity-70 text-sm py-6 text-center">No matching equipment found.</p>';
+                return;
+            }
+            list.innerHTML = [...groups.entries()].sort((a,b) => a[1].name.localeCompare(b[1].name)).map(([key, group]) => {
+                const available = group.units.filter(i => i.status === 'Available').length;
+                const inUse = group.units.filter(i => i.status === 'In-Use').length;
+                const defective = group.units.filter(i => i.status === 'Defective').length;
+                const expanded = query || status !== 'ALL' || openCatalogGroups.has(key);
+                const modelSections = [...group.models.values()].map(({model, items}) => `
+                  <section class="rounded-xl border border-sky-400/15 overflow-hidden">
+                    <div class="px-4 py-3 bg-sky-500/10 flex flex-wrap items-center justify-between gap-2">
+                      <div><div class="text-xs uppercase tracking-wide opacity-60">Model</div>
+                        <div class="text-sm font-semibold">${htmlSafe(model?.id || 'Unclassified')}</div>
+                        <div class="text-xs opacity-65 mt-1">${htmlSafe(model?.category || 'Uncategorized')}</div></div>
+                      <div class="text-xs opacity-70">${items.length} unit${items.length === 1 ? '' : 's'}</div>
+                    </div>
+                    <div class="divide-y divide-white/10">${items.map(item => `
+                      <div class="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-3"><span class="text-xs font-mono font-semibold">${htmlSafe(item.serial)}</span>
+                            <span class="text-xs font-semibold ${statusColor(item.status)}">${htmlSafe(item.status)}</span></div>
+                          <div class="text-xs opacity-65 mt-1"><i class="fa-solid fa-location-dot mr-1"></i>${htmlSafe(item.location)}</div>
+                        </div>
+                        <button type="button" onclick="openProductDetails('${item.id}')" class="glass-btn rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap self-start sm:self-center"><i class="fa-solid fa-gear mr-2"></i>Manage</button>
+                      </div>`).join('')}</div>
+                  </section>`).join('');
+                // Data-group-index is numeric; no user-provided string enters an inline handler.
+                return `<details data-product-group="${htmlSafe(key)}" class="glass-card rounded-2xl overflow-hidden" ${expanded ? 'open' : ''}>
+                  <summary class="cursor-pointer list-none px-5 py-4 flex items-center gap-3 select-none" aria-label="Expand ${htmlSafe(group.name)}">
+                    <i class="fa-solid fa-boxes-stacked text-sky-400"></i>
+                    <div class="min-w-0 flex-1"><div class="font-bold text-sm">${htmlSafe(group.name)}</div>
+                      <div class="text-xs opacity-65 mt-1">${group.units.length} registered unit${group.units.length === 1 ? '' : 's'} · ${group.models.size} model${group.models.size === 1 ? '' : 's'}</div>
+                    </div>
+                    <div class="hidden sm:flex items-center gap-2 text-xs">
+                      ${available ? `<span class="text-sky-400">${available} available</span>` : ''}
+                      ${inUse ? `<span class="text-blue-400">${inUse} in use</span>` : ''}
+                      ${defective ? `<span class="text-rose-400">${defective} defective</span>` : ''}
+                    </div>
+                    <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                  </summary>
+                  <div class="px-4 pb-4 space-y-3">${modelSections}</div>
+                </details>`;
+            }).join('');
+            list.querySelectorAll('details[data-product-group]').forEach(el => {
+                el.addEventListener('toggle', () => rememberProductGroup(el.dataset.productGroup, el.open));
+            });
+            list.scrollTop = previousScroll;
+        }
+
+        function openProductDetails(itemId) {
+            const item = state.items.find(i => i.id === itemId);
+            if (!item) { alert('This equipment is no longer registered.'); return; }
+            const model = state.models.find(m => m.id === item.modelId);
+            const logs = state.logs.filter(l => l.itemId === item.id);
+            document.getElementById('productDetailContent').innerHTML = `
+              <div class="glass-card rounded-2xl p-5 space-y-3">
+                <div class="flex justify-between items-start gap-3"><div><div class="text-lg font-bold">${htmlSafe(model?.name || 'Unknown model')}</div><div class="text-xs opacity-70 mt-1">${htmlSafe(model?.category || 'Uncategorized')} · ${htmlSafe(model?.id || '')}</div></div><span class="${statusColor(item.status)} font-bold text-xs">${htmlSafe(item.status)}</span></div>
+                <div class="text-sm grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-white/10"><div><div class="text-xs opacity-60">Asset tag / Serial</div><div class="font-mono text-xs mt-1">${htmlSafe(item.serial)}</div></div><div><div class="text-xs opacity-60">Current location</div><div class="mt-1">${htmlSafe(item.location)}</div></div></div>
+              </div>
+              <div class="mt-4"><h4 class="font-semibold text-sm mb-2">Maintenance history (${logs.length})</h4>
+              <div class="space-y-2 max-h-44 overflow-y-auto">${logs.length ? logs.map(log => `<div class="glass-card rounded-xl p-3 text-xs space-y-1"><div class="font-semibold">${htmlSafe(log.status)}</div><div>${htmlSafe(log.issue)}</div><div class="opacity-70">${htmlSafe(log.action)}</div><div class="opacity-60">Reported: ${htmlSafe(log.troubleshotAt || 'N/A')}${log.repairedAt ? ' · Repaired: ' + htmlSafe(log.repairedAt) : ''}</div></div>`).join('') : '<p class="text-xs opacity-60">No maintenance records yet.</p>'}</div></div>`;
+            const common = 'type="button" class="rounded-xl px-4 py-2.5 text-sm font-semibold transition"';
+            document.getElementById('productDetailActions').innerHTML = `
+              ${item.status === 'Available' ? `<button ${common} style="background:#0284c7;color:white" onclick="productDispatch('${item.id}')"><i class="fa-solid fa-truck-fast mr-2"></i>Dispatch</button>` : ''}
+              ${item.status === 'In-Use' ? `<button ${common} style="background:#0284c7;color:white" onclick="productCheckIn('${item.id}')"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i>Check In</button>` : ''}
+              ${item.status !== 'Defective' ? `<button ${common} style="background:#be123c;color:white" onclick="productReportFault('${item.id}')"><i class="fa-solid fa-triangle-exclamation mr-2"></i>Report Fault</button>` : ''}
+              ${item.status === 'Defective' ? `<button ${common} style="background:#047857;color:white" onclick="productMarkRepaired('${item.id}')"><i class="fa-solid fa-screwdriver-wrench mr-2"></i>Mark as Repaired</button>` : ''}
+              `;
+            openModal('productDetailModal');
+        }
+        function refreshProductCatalogIfOpen() {
+            if (!document.getElementById('productCatalogModal').classList.contains('hidden')) renderProductCatalog();
+        }
+        function productDispatch(id) { closeModal('productDetailModal'); openDeployModal(id); }
+        function productCheckIn(id) {
+            if (!confirm('Check in this equipment and mark it Available?')) return;
+            checkInItem(id); closeModal('productDetailModal'); refreshProductCatalogIfOpen();
+        }
+        function productReportFault(id) { closeModal('productDetailModal'); openMaintModal(id); }
+        function productMarkRepaired(id) {
+            closeModal('productDetailModal');
+            openRepairModal(id);
+        }
+        // Keep the catalog synchronized when a status is changed from an existing dialog.
+        const baseSaveState = saveState;
+        saveState = function() { baseSaveState(); refreshProductCatalogIfOpen(); };
+        // Ollama runs locally on the same computer as the browser. No API key needed.
+        const OLLAMA_ENDPOINT = 'http://127.0.0.1:11434';
+        const OLLAMA_MODEL = 'qwen3:0.6b';
+        let aiLastResult = null;
+        let aiRequestController = null;
+
+        function openAiAssistant(itemId = null) {
+            const selector = document.getElementById('aiEquipmentSelect');
+            const existingSelection = itemId || selector.value;
+            selector.replaceChildren();
+            state.items.forEach(item => {
+                const model = state.models.find(m => m.id === item.modelId);
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = `${model?.name || 'Unknown model'} · ${item.serial} (${item.status})`;
+                selector.appendChild(option);
+            });
+            if (state.items.some(item => item.id === existingSelection)) selector.value = existingSelection;
+            resetAiResult();
+            openModal('aiAssistantModal');
+            checkOllamaConnection();
+        }
+
+        function resetAiResult() {
+            aiLastResult = null;
+            document.getElementById('aiResultPanel').classList.add('hidden');
+            document.getElementById('aiErrorText').classList.add('hidden');
+        }
+
+        function showAiError(message) {
+            const errorElement = document.getElementById('aiErrorText');
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+        }
+
+        async function checkOllamaConnection() {
+            const status = document.getElementById('aiConnectionStatus');
+            status.textContent = 'Checking local service…';
+            try {
+                const response = await fetch(`${OLLAMA_ENDPOINT}/api/tags`, {signal: AbortSignal.timeout(6000)});
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                const available = (data.models || []).some(model => model.name === OLLAMA_MODEL || model.model === OLLAMA_MODEL);
+                status.textContent = available ? '● Connected · Qwen3 ready' : '● Connected · download qwen3:0.6b';
+                status.className = available ? 'font-semibold text-emerald-400' : 'font-semibold text-amber-400';
+            } catch (error) {
+                status.textContent = '● Offline / browser access blocked';
+                status.className = 'font-semibold text-rose-400';
+            }
+        }
+
+        async function analyzeEquipmentWithAi() {
+            const itemId = document.getElementById('aiEquipmentSelect').value;
+            const symptoms = document.getElementById('aiIssueInput').value.trim();
+            const item = state.items.find(i => i.id === itemId);
+            if (!item) { showAiError('Register or select an equipment unit first.'); return; }
+            if (!symptoms) { showAiError('Please describe the equipment problem first.'); return; }
+            resetAiResult();
+            const model = state.models.find(m => m.id === item.modelId);
+            const priorLogs = state.logs.filter(log => log.itemId === itemId).slice(0, 2);
+            const history = priorLogs.map(log => String(log.issue || '').slice(0, 100)).join('; ') || 'None';
+            const prompt = `/no_think\nYou are a cautious broadcast equipment assistant. Give a BRIEF answer (maximum 100 words), using exactly these headings: Possible causes, Safe checks, Escalate if. Give safe basic checks only. Do not claim a confirmed diagnosis. Advise checking the manufacturer's manual.\nEquipment: ${model?.name || 'Unknown'}\nStatus: ${item.status}\nPrevious issues: ${history}\nProblem: ${symptoms}`;
+            const button = document.getElementById('aiAnalyzeButton');
+            button.disabled = true;
+            button.textContent = 'Analyzing… low-memory mode';
+            aiRequestController = new AbortController();
+            const timeout = setTimeout(() => aiRequestController.abort(), 180000);
+            try {
+                const response = await fetch(`${OLLAMA_ENDPOINT}/api/generate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model: OLLAMA_MODEL, prompt, stream: false, think: false, options: {temperature: 0.2, num_predict: 180, num_ctx: 1024}}),
+                    signal: aiRequestController.signal
+                });
+                if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}.`);
+                const result = await response.json();
+                if (!result.response?.trim()) throw new Error('Ollama returned an empty response.');
+                if (document.getElementById('aiEquipmentSelect').value !== itemId || document.getElementById('aiIssueInput').value.trim() !== symptoms) {
+                    showAiError('The selected equipment or symptoms changed while AI was analyzing. Run the analysis again for the updated selection.');
+                    return;
+                }
+                aiLastResult = {itemId, symptoms, recommendations: result.response.trim()};
+                document.getElementById('aiResultText').textContent = aiLastResult.recommendations;
+                document.getElementById('aiResultPanel').classList.remove('hidden');
+            } catch (error) {
+                const detail = error.name === 'AbortError' ? 'The request timed out after 3 minutes.' : error.message;
+                showAiError(`${detail} Check that Ollama is running and qwen3:0.6b is installed. Close unnecessary apps to free memory. Open this page via http://localhost:8000 (not as a file). If the browser blocks requests, configure Ollama to allow the exact dashboard origin.`);
+            } finally {
+                clearTimeout(timeout);
+                aiRequestController = null;
+                button.disabled = false;
+                button.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-2"></i>Analyze with AI';
+            }
+        }
+
+        function prepareAiMaintenanceDraft() {
+            if (!aiLastResult) return;
+            const item = state.items.find(i => i.id === aiLastResult.itemId);
+            if (!item) { showAiError('The selected equipment no longer exists.'); return; }
+            if (item.status === 'Defective' || state.logs.some(log => log.itemId === item.id && log.status === 'Active Issue')) {
+                showAiError('This equipment already has an active fault. Review its existing maintenance history; do not create a duplicate report.');
+                return;
+            }
+            closeModal('aiAssistantModal');
+            openMaintModal(item.id);
+            document.getElementById('maintIssue').value = aiLastResult.symptoms;
+            document.getElementById('maintAction').value = `AI-assisted suggestions (unverified; technician must review):\n${aiLastResult.recommendations}`;
+            // The user must explicitly submit the existing form to flag the unit defective.
+        }
+
+        function closeNavMenu() {
+            document.getElementById('navMoreMenu').open = false;
+        }
+        function openNavAction(modalId) {
+            closeNavMenu();
+            openModal(modalId);
+        }
+        function confirmResetDashboard() {
+            closeNavMenu();
+            if (confirm('Restore the original demo inventory? This will replace your saved equipment and maintenance changes.')) resetData();
+        }
+        document.addEventListener('click', e => {
+            const menu = document.getElementById('navMoreMenu');
+            if (menu.open && !menu.contains(e.target)) closeNavMenu();
+        });
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape') {
+            closeNavMenu();
+            ['aiAssistantModal','productDetailModal','productCatalogModal'].forEach(id => closeModal(id));
+          }
+        });
+
+        render();
+    </script>
+</body>
+</html>
